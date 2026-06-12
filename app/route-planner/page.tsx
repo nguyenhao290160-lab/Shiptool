@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   DeliveryOrder,
@@ -16,8 +16,22 @@ import {
   hasAllCoords,
   hasAnyCoords,
 } from "@/lib/routeUtils";
+import {
+  calculateRouteDirections,
+  DirectionsResult,
+  extractRouteWaypoints,
+  validateRouteCoordinates,
+} from "@/lib/directions";
+import {
+  calculateDistanceMatrix,
+  calculateRouteTotalsFromMatrix,
+  getMatrixCell,
+} from "@/lib/distanceMatrix";
+import { isOnline, loadGoogleMapsScript } from "@/lib/mapUtils";
 import { RoutePointCard } from "@/components/RoutePointCard";
 import { RouteStats } from "@/components/RouteStats";
+import { DirectionsPanel } from "@/components/DirectionsPanel";
+import { DistanceMatrixSummary } from "@/lib/distanceMatrix";
 
 // ── Helper: convert DeliveryOrder → RoutePoint ──────────────────────
 
@@ -37,6 +51,72 @@ const orderToPoint = (
   lng: order.lng,
 });
 
+// ── Helper: optimize route using Distance Matrix ─────────────────────
+
+const optimizeRouteWithMatrix = (
+  points: RoutePoint[],
+  matrix: DistanceMatrixSummary,
+  startPointId: string
+): RoutePoint[] => {
+  if (points.length === 0) return points;
+  if (points.length === 1) return points;
+
+  const remaining = [...points];
+  const optimized: RoutePoint[] = [];
+  let currentId = startPointId;
+
+  // Nearest neighbor algorithm based on duration/distance
+  while (remaining.length > 0) {
+    let bestIdx = 0;
+    let bestScore = Infinity;
+
+    for (let i = 0; i < remaining.length; i++) {
+      const point = remaining[i];
+      const cell = getMatrixCell(matrix, currentId, point.orderId);
+
+      // Calculate score: prioritize high priority, then shorter duration/distance
+      let score = Infinity;
+
+      if (cell && cell.status === "OK") {
+        // Base score: duration (seconds)
+        score = cell.durationSeconds;
+
+        // Penalize low priority orders (multiply by 2 to deprioritize)
+        if (point.priority === "low") {
+          score *= 1.5;
+        }
+
+        // Boost high priority orders (divide to prioritize)
+        if (point.priority === "high") {
+          score *= 0.5;
+        }
+
+        // Slightly prefer delivering orders over pending
+        if (point.status === "delivering" && currentId !== startPointId) {
+          score *= 0.95;
+        }
+      }
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+
+    // Add best point to optimized route
+    const nextPoint = remaining.splice(bestIdx, 1)[0];
+    if (nextPoint) {
+      optimized.push({
+        ...nextPoint,
+        sequence: optimized.length + 1,
+      });
+      currentId = nextPoint.orderId;
+    }
+  }
+
+  return optimized;
+};
+
 // ── Page ────────────────────────────────────────────────────────────
 
 export default function RoutePlannerPage() {
@@ -47,6 +127,16 @@ export default function RoutePlannerPage() {
   const [startAddress, setStartAddress] = useState("");
   const [optimizeMsg, setOptimizeMsg] = useState("");
   const [hasExistingOrders, setHasExistingOrders] = useState(false);
+  const [directions, setDirections] = useState<DirectionsResult | null>(null);
+  const [directionsLoading, setDirectionsLoading] = useState(false);
+  const [directionsError, setDirectionsError] = useState<string | null>(null);
+  const [distanceMatrixLoading, setDistanceMatrixLoading] = useState(false);
+  const [distanceMatrixError, setDistanceMatrixError] = useState<string | null>(null);
+  const [optimizeStats, setOptimizeStats] = useState<{
+    before: { distance: string; duration: string };
+    after: { distance: string; duration: string };
+  } | null>(null);
+  const polylineRef = useRef<unknown>(null);
 
   // ── Hydration-safe init ───────────────────────────────────────────
 
@@ -153,6 +243,117 @@ export default function RoutePlannerPage() {
     );
   }, [plan]);
 
+  // ── Optimize route with Distance Matrix ───────────────────────────
+
+  const optimiseRouteWithDistanceMatrix = useCallback(async () => {
+    if (!plan || plan.points.length < 2) {
+      setDistanceMatrixError("Cần ít nhất 2 điểm để tối ưu bằng Distance Matrix.");
+      return;
+    }
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setDistanceMatrixError("Chưa cấu hình Google Maps API key.");
+      return;
+    }
+
+    if (!isOnline()) {
+      setDistanceMatrixError(
+        "Bạn đang offline, không thể tối ưu bằng Google Distance Matrix."
+      );
+      return;
+    }
+
+    // Check if all points have coordinates
+    const allCoords = hasAllCoords(plan.points);
+    if (!allCoords) {
+      setDistanceMatrixError("Có đơn chưa có tọa độ. Hãy dùng chức năng Lấy tọa độ trước.");
+      return;
+    }
+
+    try {
+      setDistanceMatrixLoading(true);
+      setDistanceMatrixError(null);
+      setOptimizeStats(null);
+
+      // Ensure Google Maps script is loaded
+      await loadGoogleMapsScript();
+
+      // Calculate current route totals (before optimization)
+      const beforeStats = calculateRouteTotalsFromMatrix(
+        {
+          cells: [],
+          validCellCount: 0,
+          totalCellCount: 0,
+        },
+        "start",
+        plan.points.map((p) => p.orderId)
+      );
+
+      // Calculate Distance Matrix
+      const matrix = await calculateDistanceMatrix(
+        plan.startPoint,
+        plan.points,
+        apiKey
+      );
+
+      if (matrix.validCellCount === 0) {
+        setDistanceMatrixError(
+          "Không thể tính khoảng cách giữa các điểm giao. Google Distance Matrix API có thể đang lỗi hoặc bị giới hạn."
+        );
+        setDistanceMatrixLoading(false);
+        return;
+      }
+
+      // Optimize route using nearest neighbor with Distance Matrix data
+      const optimizedPoints = optimizeRouteWithMatrix(
+        plan.points,
+        matrix,
+        "start"
+      );
+
+      // Calculate optimized route totals
+      const afterStats = calculateRouteTotalsFromMatrix(
+        matrix,
+        "start",
+        optimizedPoints.map((p) => p.orderId)
+      );
+
+      // Update plan with optimized points
+      const now = new Date().toISOString();
+      const updated: DeliveryRoutePlan = {
+        ...plan,
+        points: optimizedPoints,
+        updatedAt: now,
+      };
+
+      saveRoutePlan(updated);
+      setPlan(updated);
+
+      // Set optimization stats for display
+      setOptimizeStats({
+        before: {
+          distance: beforeStats.totalDistanceText,
+          duration: beforeStats.totalDurationText,
+        },
+        after: {
+          distance: afterStats.totalDistanceText,
+          duration: afterStats.totalDurationText,
+        },
+      });
+
+      setOptimizeMsg("Đã tối ưu tuyến bằng Google Distance Matrix!");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Không thể tối ưu tuyến. Google Distance Matrix API có thể đang lỗi hoặc bị giới hạn.";
+      setDistanceMatrixError(message);
+    } finally {
+      setDistanceMatrixLoading(false);
+    }
+  }, [plan]);
+
   // ── Reset order ───────────────────────────────────────────────────
 
   const resetOrder = useCallback(() => {
@@ -205,6 +406,91 @@ export default function RoutePlannerPage() {
     saveRoutePlan(updated);
     setPlan(updated);
   };
+
+  // ── Draw directions on map ────────────────────────────────────────
+
+  const handleDrawDirections = useCallback(async () => {
+    if (!plan || plan.points.length < 2) {
+      setDirectionsError("Cần ít nhất 2 điểm để vẽ tuyến đường.");
+      return;
+    }
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setDirectionsError("Chưa cấu hình Google Maps API key.");
+      return;
+    }
+
+    if (!isOnline()) {
+      setDirectionsError("Bạn đang offline, không thể vẽ tuyến đường bằng Google Directions.");
+      return;
+    }
+
+    // Validate all points have coordinates
+    const validation = validateRouteCoordinates(plan.startPoint, plan.points);
+    if (!validation.valid) {
+      setDirectionsError(validation.message || "Một số điểm chưa có tọa độ.");
+      return;
+    }
+
+    try {
+      setDirectionsLoading(true);
+      setDirectionsError(null);
+
+      // Ensure Google Maps script is loaded
+      await loadGoogleMapsScript();
+
+      // Extract origin, destination, waypoints
+      const { origin, destination, waypoints } = extractRouteWaypoints(plan.startPoint, plan.points);
+
+      if (!origin || !destination) {
+        setDirectionsError("Không thể xác định điểm bắt đầu hoặc kết thúc.");
+        setDirectionsLoading(false);
+        return;
+      }
+
+      // Calculate directions
+      const result = await calculateRouteDirections(origin, destination, waypoints);
+
+      setDirections(result);
+      setDirectionsError(null);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Không thể vẽ tuyến đường. Google Directions API có thể đang lỗi hoặc bị giới hạn.";
+      setDirectionsError(message);
+      setDirections(null);
+    } finally {
+      setDirectionsLoading(false);
+    }
+  }, [plan]);
+
+  const handleRenderPolyline = useCallback(async () => {
+    if (!directions || !directions.polyline) return;
+
+    try {
+      // Ensure Google Maps script is loaded
+      await loadGoogleMapsScript();
+
+      // For now, we're just storing the directions, as we don't have a live map instance
+      // In a full implementation, you'd get the map from a MapView component
+      // and then call: renderDirectionsPolyline(mapInstance, directions.polyline)
+      console.log("Polyline ready:", directions.polyline);
+    } catch (err) {
+      console.error("Error rendering polyline:", err);
+    }
+  }, [directions]);
+
+  const handleClearRoute = useCallback(() => {
+    if (polylineRef.current) {
+      const polyline = polylineRef.current as google.maps.Polyline;
+      polyline.setMap(null);
+      polylineRef.current = null;
+    }
+    setDirections(null);
+    setDirectionsError(null);
+  }, []);
 
   // ── SSR placeholder ───────────────────────────────────────────────
 
@@ -359,6 +645,109 @@ export default function RoutePlannerPage() {
           </button>
         </div>
 
+        {/* ── Distance Matrix Optimization button ── */}
+        {plan && (
+          <button
+            onClick={optimiseRouteWithDistanceMatrix}
+            disabled={distanceMatrixLoading || !hasAllCoords(plan.points)}
+            className="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:bg-slate-400 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+          >
+            {distanceMatrixLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Đang tối ưu...
+              </>
+            ) : (
+              <>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19l-7-7 7-7m8 0a7 7 0 100 14 7 7 0 000-14z"
+                  />
+                </svg>
+                Tối ưu bằng Google Distance Matrix
+              </>
+            )}
+          </button>
+        )}
+
+        {/* ── API Quota Warning ── */}
+        {plan && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-start gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4 text-amber-600 mt-0.5 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <p className="text-[11px] text-amber-800 font-medium leading-relaxed">
+              Tối ưu bằng Google Distance Matrix sử dụng Google API và có thể tính phí theo số lượt gọi. Hãy kiểm tra quota trong Google Cloud.
+            </p>
+          </div>
+        )}
+
+        {/* ── Distance Matrix Error message ── */}
+        {distanceMatrixError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-800 font-medium leading-relaxed flex items-start gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4 text-red-600 mt-0.5 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            {distanceMatrixError}
+          </div>
+        )}
+
+        {/* ── Optimization Stats ── */}
+        {optimizeStats && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-bold text-emerald-900">Kết quả tối ưu</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                  Trước tối ưu
+                </p>
+                <p className="text-xs text-emerald-900 font-medium">
+                  {optimizeStats.before.distance} - {optimizeStats.before.duration}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                  Sau tối ưu
+                </p>
+                <p className="text-xs text-emerald-900 font-medium">
+                  {optimizeStats.after.distance} - {optimizeStats.after.duration}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Delete route button ── */}
         {plan && (
           <button
@@ -398,6 +787,43 @@ export default function RoutePlannerPage() {
           <>
             {/* Stats */}
             <RouteStats points={plan.points} startPoint={plan.startPoint} />
+
+            {/* Draw directions button */}
+            <button
+              onClick={handleDrawDirections}
+              disabled={directionsLoading || plan.points.length < 2}
+              className="w-full bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 disabled:bg-slate-400 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            >
+              {directionsLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Đang tính tuyến...
+                </>
+              ) : directions ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19l-7-7 7-7m8 7a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Cập nhật tuyến
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19l-7-7 7-7m8 7a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Vẽ tuyến đường
+                </>
+              )}
+            </button>
+
+            {/* Directions panel */}
+            <DirectionsPanel
+              directions={directions}
+              isLoading={directionsLoading}
+              error={directionsError}
+              onDrawRoute={handleRenderPolyline}
+              onClearRoute={handleClearRoute}
+            />
 
             {/* Coordinate status */}
             {coordMsg && (

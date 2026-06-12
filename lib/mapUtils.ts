@@ -21,6 +21,11 @@ declare global {
         setMap(map: Map | null): void;
         setPosition(position: LatLng): void;
       }
+      class Polyline {
+        constructor(options?: Record<string, unknown>);
+        setMap(map: Map | null): void;
+        setPath(path: LatLng[]): void;
+      }
       class LatLngBounds {
         constructor(sw?: LatLng, ne?: LatLng);
         extend(point: LatLng | { lat: number; lng: number }): void;
@@ -28,10 +33,37 @@ declare global {
       class LatLng {
         constructor(lat: number, lng: number);
       }
+      class DirectionsService {
+        constructor();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+        route(request: Record<string, unknown>, callback: Function): void;
+      }
+      class DirectionsRenderer {
+        constructor(options?: Record<string, unknown>);
+        setMap(map: Map | null): void;
+        setDirections(directions: Record<string, unknown>): void;
+      }
+      class DistanceMatrixService {
+        constructor();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+        getDistanceMatrix(request: Record<string, unknown>, callback: Function): void;
+      }
+      enum UnitSystem {
+        METRIC,
+        IMPERIAL,
+      }
       // eslint-disable-next-line @typescript-eslint/no-namespace
       namespace event {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
         function addListener(instance: unknown, eventName: string, handler: Function): void;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-namespace
+      namespace geometry {
+        // eslint-disable-next-line @typescript-eslint/no-namespace
+        namespace encoding {
+          function decodePath(path: string): Array<{ lat: number; lng: number }>;
+          function encodePath(path: LatLng[]): string;
+        }
       }
       enum MapTypeId {
         ROADMAP,
