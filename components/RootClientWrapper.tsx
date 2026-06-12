@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { OfflineStatusBanner } from "./OfflineStatusBanner";
+import { MobileNav } from "./MobileNav";
 
 export function RootClientWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -16,7 +17,8 @@ export function RootClientWrapper({ children }: { children: React.ReactNode }) {
   return (
     <>
       <OfflineStatusBanner />
-      <div className="pt-14">{children}</div>
+      <div className="pt-14 pb-20">{children}</div>
+      <MobileNav />
     </>
   );
 }

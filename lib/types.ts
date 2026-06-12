@@ -88,6 +88,48 @@ export interface DeliveryRoutePlan {
   updatedAt: string;
 }
 
+// ── Route History (Prompt 14) ───────────────────────────────────────
+
+export interface RouteHistoryPoint {
+  orderId: string;
+  sequence: number;
+  customerName: string;
+  phone?: string;
+  address: string;
+  status: string;
+  priority?: string;
+  lat?: number;
+  lng?: number;
+  note?: string;
+}
+
+export interface RouteHistoryItem {
+  id: string;
+  name: string;
+  date: string; // ISO
+  status: "draft" | "in_progress" | "completed" | "cancelled";
+  startPoint?: {
+    name?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+  };
+  points: RouteHistoryPoint[];
+  totalOrders: number;
+  deliveredOrders: number;
+  failedOrders: number;
+  cancelledOrders: number;
+  totalDistanceMeters?: number;
+  totalDurationSeconds?: number;
+  distanceText?: string;
+  durationText?: string;
+  optimizedBy?: "local" | "distance_matrix" | "manual";
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 // ── Map View (Prompt 4) ─────────────────────────────────────────────
 
 export type GoogleMapLoadStatus =

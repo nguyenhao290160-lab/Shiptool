@@ -1,5 +1,6 @@
 import React from "react";
 import { OrderStop } from "@/lib/types";
+import { StatusBadge } from "./ui/StatusBadge";
 
 interface Props {
   order: OrderStop;
@@ -10,17 +11,7 @@ interface Props {
 }
 
 export const OrderCard = ({ order, index, onEdit, onDelete, isDeliveryMode = false }: Props) => {
-  const statusColors = {
-    pending: "bg-yellow-100 text-yellow-800",
-    delivered: "bg-green-100 text-green-800",
-    skipped: "bg-gray-100 text-gray-800",
-  };
-
-  const statusLabels = {
-    pending: "Chưa giao",
-    delivered: "Đã giao",
-    skipped: "Bỏ qua",
-  };
+  // status rendering is delegated to StatusBadge for consistent styling
 
   return (
     <div className={`bg-white rounded-3xl p-5 shadow-sm border ${isDeliveryMode ? 'border-orange-200 shadow-orange-100' : 'border-slate-200'} flex flex-col gap-3 relative overflow-hidden`}>
@@ -33,9 +24,7 @@ export const OrderCard = ({ order, index, onEdit, onDelete, isDeliveryMode = fal
             {order.receiverName || order.label}
           </h3>
         </div>
-        <span className={`text-xs px-3 py-1 rounded-full font-bold tracking-wide ${statusColors[order.status]}`}>
-          {statusLabels[order.status]}
-        </span>
+        <StatusBadge state={order.status} />
       </div>
 
       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 mt-1">

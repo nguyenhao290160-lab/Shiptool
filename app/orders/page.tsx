@@ -308,10 +308,10 @@ export default function OrdersPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleAddNew}
-            className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm shadow-cyan-600/20 flex items-center gap-1.5"
-          >
+           <button
+             onClick={handleAddNew}
+             className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white px-4 h-10 rounded-xl font-bold text-sm transition-colors shadow-sm shadow-cyan-600/20 flex items-center gap-1.5"
+           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-4 w-4"
@@ -363,7 +363,7 @@ export default function OrdersPage() {
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key)}
-              className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`whitespace-nowrap px-3 py-2.5 rounded-lg text-xs font-bold transition-colors ${
                 filter === tab.key
                   ? "bg-cyan-600 text-white"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -472,7 +472,7 @@ export default function OrdersPage() {
                   <button
                     onClick={handleGeocodeMissingOrders}
                     disabled={batchResult !== null}
-                    className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                    className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 px-4 h-10 rounded-lg transition-colors whitespace-nowrap flex items-center justify-center"
                   >
                     {batchResult ? "Xong" : "Lấy tọa độ cho tất cả"}
                   </button>

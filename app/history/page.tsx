@@ -1,29 +1,27 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { MobilePageShell } from "@/components/MobilePageShell";
 import { LocalDataBackupPanel } from "@/components/LocalDataBackupPanel";
-import { getRoutes, deleteRoute } from "@/lib/storage";
-import { RoutePlan } from "@/lib/types";
+import { getRouteHistory, deleteRouteHistoryItem, updateRouteHistoryItem } from "@/lib/routeHistoryStorage";
+import { RouteHistoryItem } from "@/lib/types";
 
 export default function HistoryPage() {
-  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
-  const [routes, setRoutes] = useState<RoutePlan[]>([]);
+  const [routes, setRoutes] = useState<RouteHistoryItem[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsMounted(true);
-       
-      setRoutes(getRoutes().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      setRoutes(getRouteHistory().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }, 0);
     return () => clearTimeout(timer);
   }, []);
 
   const handleDataImported = () => {
     // Reload routes after data import
-    setRoutes(getRoutes().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    setRoutes(getRouteHistory().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   };
 
 
@@ -32,8 +30,33 @@ export default function HistoryPage() {
     return <MobilePageShell title="Lịch sử tuyến" showBack><div className="p-5"></div></MobilePageShell>;
   }
 
+  // ── Summary stats ───────────────────────────────────────────────
+  const totalRoutes = routes.length;
+  const totalCompleted = routes.filter((r) => r.status === "completed").length;
+  const totalOrders = routes.reduce((s, r) => s + (r.totalOrders || 0), 0);
+  const totalDistanceMeters = routes.reduce((s, r) => s + (r.totalDistanceMeters || 0), 0);
+  const totalDurationSeconds = routes.reduce((s, r) => s + (r.totalDurationSeconds || 0), 0);
+
   return (
     <MobilePageShell title="Lịch sử tuyến" showBack>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="bg-cyan-50 rounded-xl border border-cyan-100 p-3">
+          <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-1">Tổng tuyến</p>
+          <p className="text-lg font-bold text-cyan-900">{totalRoutes}</p>
+        </div>
+        <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-3">
+          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Hoàn thành</p>
+          <p className="text-lg font-bold text-emerald-900">{totalCompleted}</p>
+        </div>
+        <div className="bg-slate-50 rounded-xl border border-slate-100 p-3">
+          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Tổng đơn</p>
+          <p className="text-lg font-bold text-slate-900">{totalOrders}</p>
+        </div>
+        <div className="bg-amber-50 rounded-xl border border-amber-100 p-3">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Tổng km</p>
+          <p className="text-lg font-bold text-amber-900">{totalDistanceMeters ? `${Math.round(totalDistanceMeters/1000)} km` : '—'}</p>
+        </div>
+      </div>
       {routes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -43,12 +66,11 @@ export default function HistoryPage() {
           </div>
           <p className="text-gray-500 font-medium">Không có lịch sử tuyến nào.</p>
         </div>
-      ) : (
+        ) : (
         <div className="flex flex-col gap-4">
           {routes.map((route) => {
-            const total = route.stops.length;
-            const delivered = route.stops.filter(s => s.status === 'delivered').length;
-            
+            const total = route.points.length;
+            const delivered = route.deliveredOrders;
             return (
               <div key={route.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-3 transition-transform active:scale-95">
                 <div className="flex justify-between items-start">
@@ -61,37 +83,79 @@ export default function HistoryPage() {
                       {new Date(route.createdAt).toLocaleDateString("vi-VN")}
                     </p>
                   </div>
-                  <span className={`text-xs px-3 py-1 rounded-full font-bold ${route.status === 'completed' ? 'bg-slate-100 text-slate-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {route.status === 'completed' ? 'Đã xong' : 'Đang giao'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-3 py-1 rounded-full font-bold ${route.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : route.status === 'in_progress' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                      {route.status === 'completed' ? 'Hoàn thành' : route.status === 'in_progress' ? 'Đang chạy' : route.status === 'draft' ? 'Nháp' : 'Đã hủy'}
+                    </span>
+                    <button onClick={() => setExpanded(expanded === route.id ? null : route.id)} className="text-xs text-slate-600 font-medium">{expanded === route.id ? 'Thu gọn' : 'Xem'}</button>
+                  </div>
                 </div>
-                
+
                 <div className="bg-slate-50 p-3 rounded-2xl flex justify-between items-center border border-slate-100">
                   <span className="text-slate-600 font-bold">Tiến độ:</span>
                   <span className="font-black text-lg text-slate-900">{delivered} / {total} đơn</span>
                 </div>
 
-                <div className="flex gap-2 mt-1">
-                  <button 
-                    onClick={() => router.push(`/route/${route.id}/${route.status === 'completed' ? 'orders' : 'delivery'}`)}
-                    className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-200"
-                  >
-                    Xem chi tiết
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (confirm("Bạn có chắc muốn xóa tuyến này?")) {
-                        deleteRoute(route.id);
-                        setRoutes(getRoutes().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-                      }
-                    }}
-                    className="bg-red-50 text-red-600 p-3 rounded-xl font-bold hover:bg-red-100"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
+                {expanded === route.id && (
+                  <div className="space-y-3">
+                    <div className="text-sm text-slate-700">
+                      <p className="font-semibold">Ghi chú:</p>
+                      <p className="text-slate-600">{route.note || '-'} </p>
+                    </div>
+
+                    <div className="text-sm">
+                      <p className="font-semibold mb-2">Danh sách điểm ({route.points.length})</p>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {route.points.map((p) => (
+                          <div key={p.orderId} className="p-3 bg-white border border-slate-100 rounded-lg">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 truncate">{p.sequence}. {p.customerName}</p>
+                                <p className="text-xs text-slate-500 truncate">{p.address}</p>
+                                <p className="text-xs text-slate-500">{p.phone}</p>
+                              </div>
+                              <div className="text-xs font-semibold text-slate-600">{p.status}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const newStatus = route.status === 'completed' ? 'draft' : 'completed';
+                          if (newStatus === 'completed' && !confirm('Đánh dấu tuyến là hoàn thành?')) return;
+                          updateRouteHistoryItem(route.id, { status: newStatus, completedAt: newStatus === 'completed' ? new Date().toISOString() : undefined });
+                          setRoutes(getRouteHistory().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+                        }}
+                        className="flex-1 bg-cyan-50 text-cyan-700 py-2 rounded-xl font-bold"
+                      >
+                        {route.status === 'completed' ? 'Đánh dấu Nháp' : 'Đánh dấu Hoàn thành'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newNote = window.prompt('Sửa ghi chú', route.note || '') || route.note;
+                          updateRouteHistoryItem(route.id, { note: newNote });
+                          setRoutes(getRouteHistory().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+                        }}
+                        className="bg-slate-100 text-slate-700 py-2 px-3 rounded-xl font-bold"
+                      >
+                        Sửa ghi chú
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!confirm('Bạn có chắc muốn xóa lịch sử tuyến này không?')) return;
+                          deleteRouteHistoryItem(route.id);
+                          setRoutes(getRouteHistory().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+                        }}
+                        className="bg-red-50 text-red-600 py-2 px-3 rounded-xl font-bold"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

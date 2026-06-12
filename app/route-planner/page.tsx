@@ -22,6 +22,7 @@ import {
   extractRouteWaypoints,
   validateRouteCoordinates,
 } from "@/lib/directions";
+import { createHistoryFromRoutePlan } from "@/lib/routeHistoryStorage";
 import {
   calculateDistanceMatrix,
   calculateRouteTotalsFromMatrix,
@@ -394,6 +395,41 @@ export default function RoutePlannerPage() {
     setOptimizeMsg("Đã lưu tuyến thành công!");
   }, [plan, startName, startAddress]);
 
+  const handleSaveToHistory = useCallback(() => {
+    if (!plan) return;
+    if (!confirm("Bạn có muốn lưu tuyến hiện tại vào lịch sử không?")) return;
+
+    const name = window.prompt("Tên tuyến (ví dụ: Tuyến sáng hôm nay)", plan.name) || plan.name;
+    const note = window.prompt("Ghi chú ngắn (tùy chọn)", "") || undefined;
+
+    // Try to extract simple distance/duration text from optimizeStats if present
+    const distanceText = (optimizeStats && optimizeStats.after?.distance) || undefined;
+    const durationText = (optimizeStats && optimizeStats.after?.duration) || undefined;
+
+    createHistoryFromRoutePlan(plan, {
+      name,
+      note,
+      status: "completed",
+      distanceText,
+      durationText,
+      optimizedBy: "local",
+    });
+
+    // mark plan as completed
+    const updatedPlan: DeliveryRoutePlan = { ...(plan as DeliveryRoutePlan), updatedAt: new Date().toISOString(), name };
+    // If route saving function exists, persist
+    try {
+      // saveRoutePlan may be imported above; reuse existing handleSaveRoute behavior
+      // but to avoid duplicate code, call existing save
+      saveRoutePlan(updatedPlan);
+      setPlan(updatedPlan);
+    } catch (err) {
+      console.warn("Failed to update plan after saving history", err);
+    }
+
+    setOptimizeMsg("Đã lưu vào lịch sử tuyến");
+  }, [plan, optimizeStats]);
+
   // ── Move helpers ──────────────────────────────────────────────────
 
   const moveTo = (fromIdx: number, toIdx: number) => {
@@ -563,6 +599,19 @@ export default function RoutePlannerPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Save to history (complete) ── */}
+        {plan && (
+          <button
+            onClick={handleSaveToHistory}
+            className="w-full mt-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M9 3v4m6-4v4M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
+            </svg>
+            Hoàn thành và lưu lịch sử
+          </button>
+        )}
       </header>
 
       {/* ── Main content ── */}
@@ -606,7 +655,7 @@ export default function RoutePlannerPage() {
           <button
             onClick={buildRouteFromOrders}
             disabled={!hasExistingOrders && !plan}
-            className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white py-3 h-10 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

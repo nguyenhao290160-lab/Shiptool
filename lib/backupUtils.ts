@@ -3,7 +3,7 @@
  * Supports exporting to JSON and CSV, importing backups, and managing local data.
  */
 
-import { DeliveryOrder, DeliveryRoutePlan } from "./types";
+import { DeliveryOrder, DeliveryRoutePlan, RouteHistoryItem } from "./types";
 
 const ORDERS_KEY = "shiproute_delivery_orders";
 const ROUTE_PLAN_KEY = "shiproute_route_plan";
@@ -14,6 +14,7 @@ export interface ShipRouteBackupData {
   appName: "ShipRoute AI";
   orders?: DeliveryOrder[];
   routePlan?: DeliveryRoutePlan | null;
+  routeHistory?: RouteHistoryItem[];
   metadata?: {
     totalOrders?: number;
     totalRoutePoints?: number;
@@ -39,11 +40,13 @@ export const getAllLocalData = (): ShipRouteBackupData => {
   try {
     const orders = localStorage.getItem(ORDERS_KEY);
     const routePlan = localStorage.getItem(ROUTE_PLAN_KEY);
+    const routeHistory = localStorage.getItem("shiproute_route_history");
 
     const parsedOrders = orders ? (JSON.parse(orders) as DeliveryOrder[]) : [];
     const parsedRoutePlan = routePlan
       ? (JSON.parse(routePlan) as DeliveryRoutePlan)
       : null;
+    const parsedRouteHistory = routeHistory ? (JSON.parse(routeHistory) as RouteHistoryItem[]) : [];
 
     return {
       version: "1.0",
@@ -51,6 +54,7 @@ export const getAllLocalData = (): ShipRouteBackupData => {
       appName: "ShipRoute AI",
       orders: parsedOrders,
       routePlan: parsedRoutePlan,
+      routeHistory: parsedRouteHistory,
       metadata: {
         totalOrders: parsedOrders.length,
         totalRoutePoints: parsedRoutePlan?.points?.length || 0,
@@ -151,6 +155,11 @@ export const importBackupJSON = (data: ShipRouteBackupData): {
       localStorage.setItem(ROUTE_PLAN_KEY, JSON.stringify(data.routePlan));
     } else {
       localStorage.removeItem(ROUTE_PLAN_KEY);
+    }
+
+    // Restore route history (if present)
+    if (data.routeHistory && Array.isArray(data.routeHistory)) {
+      localStorage.setItem("shiproute_route_history", JSON.stringify(data.routeHistory));
     }
 
     return {

@@ -64,8 +64,7 @@ export const MapFallback = ({ status }: Props) => {
 
   return (
     <div
-      className={`w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center px-8 py-16 ${cfg.cls}`}
-      style={{ minHeight: 400 }}
+      className={`w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center px-6 py-12 ${cfg.cls} min-h-[320px] md:min-h-[400px]`}
     >
       <div className="mb-4">{cfg.icon}</div>
       <h3 className="text-lg font-bold mb-2">{cfg.title}</h3>
