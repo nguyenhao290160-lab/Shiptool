@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MobilePageShell } from "@/components/MobilePageShell";
+import { LocalDataBackupPanel } from "@/components/LocalDataBackupPanel";
 import { getRoutes, deleteRoute } from "@/lib/storage";
 import { RoutePlan } from "@/lib/types";
 
@@ -19,6 +20,11 @@ export default function HistoryPage() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleDataImported = () => {
+    // Reload routes after data import
+    setRoutes(getRoutes().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  };
 
 
 
@@ -91,6 +97,11 @@ export default function HistoryPage() {
           })}
         </div>
       )}
+
+      {/* ── Local Data Backup Section ── */}
+      <div className="mt-8 pt-6 border-t border-slate-200">
+        <LocalDataBackupPanel onDataImported={handleDataImported} />
+      </div>
     </MobilePageShell>
   );
 }
