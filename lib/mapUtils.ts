@@ -5,6 +5,44 @@ import {
   GoogleMapLoadStatus,
 } from "./types";
 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace google {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace maps {
+      class Map {
+        constructor(element: HTMLElement, options?: Record<string, unknown>);
+        setCenter(center: LatLng | { lat: number; lng: number }): void;
+        setZoom(zoom: number): void;
+        fitBounds(bounds: LatLngBounds, padding?: number): void;
+      }
+      class Marker {
+        constructor(options?: Record<string, unknown>);
+        setMap(map: Map | null): void;
+        setPosition(position: LatLng): void;
+      }
+      class LatLngBounds {
+        constructor(sw?: LatLng, ne?: LatLng);
+        extend(point: LatLng | { lat: number; lng: number }): void;
+      }
+      class LatLng {
+        constructor(lat: number, lng: number);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-namespace
+      namespace event {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+        function addListener(instance: unknown, eventName: string, handler: Function): void;
+      }
+      enum MapTypeId {
+        ROADMAP,
+        SATELLITE,
+        HYBRID,
+        TERRAIN
+      }
+    }
+  }
+}
+
 // ── Google Maps API key ─────────────────────────────────────────────
 
 export const getGoogleMapsApiKey = (): string | undefined => {

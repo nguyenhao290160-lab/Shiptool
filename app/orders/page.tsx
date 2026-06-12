@@ -300,6 +300,7 @@ export default function OrdersPage() {
       {/* ── Form modal ── */}
       {showForm && (
         <DeliveryOrderForm
+          key={editingOrder?.id ?? "new-order"}
           initial={editingOrder}
           onSave={handleSave}
           onCancel={() => {

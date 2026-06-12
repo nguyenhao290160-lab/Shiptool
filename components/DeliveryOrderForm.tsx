@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   DeliveryOrder,
   DeliveryStatus,
@@ -47,18 +47,6 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
   const [priority, setPriority] = useState<DeliveryPriority>(
     initial?.priority ?? "normal"
   );
-
-  // Reset when initial changes (e.g. switching from one edit to another)
-  useEffect(() => {
-    if (initial) {
-      setCustomerName(initial.customerName);
-      setPhone(initial.phone);
-      setAddress(initial.address);
-      setNote(initial.note);
-      setStatus(initial.status);
-      setPriority(initial.priority);
-    }
-  }, [initial]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

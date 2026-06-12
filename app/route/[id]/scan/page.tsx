@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, use, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { MobilePageShell } from "@/components/MobilePageShell";
 import { BigActionButton } from "@/components/BigActionButton";
@@ -269,7 +270,7 @@ export default function ScanPage({ params }: { params: Promise<{ id: string }> }
           {activeResults.map((item, index) => (
             <div key={item.id} className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 relative">
               <div className="flex gap-4 mb-4">
-                <img src={item.imageUrl} alt="Scan preview" className="w-24 h-24 object-cover rounded-xl bg-slate-100" />
+                <Image src={item.imageUrl} alt="Scan preview" width={96} height={96} className="w-24 h-24 object-cover rounded-xl bg-slate-100" />
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="font-bold text-slate-800">Ảnh {index + 1}</div>
                   <div className={`text-sm mt-1 font-medium ${
