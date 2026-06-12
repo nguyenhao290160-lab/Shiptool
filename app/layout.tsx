@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { RootClientWrapper } from "@/components/RootClientWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,7 +31,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className={inter.className}>{children}</body>
+      <head>
+        <meta name="theme-color" content="#ea580c" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="ShipRoute AI" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" />
+      </head>
+      <body className={inter.className}>
+        <RootClientWrapper>{children}</RootClientWrapper>
+      </body>
     </html>
   );
 }

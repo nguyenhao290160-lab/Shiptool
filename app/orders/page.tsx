@@ -14,6 +14,7 @@ import { getGoogleMapsApiKey, isOnline } from "@/lib/mapUtils";
 import { DeliveryDashboard } from "@/components/DeliveryDashboard";
 import { DeliveryOrderCard } from "@/components/DeliveryOrderCard";
 import { DeliveryOrderForm } from "@/components/DeliveryOrderForm";
+import { PwaInstallHint } from "@/components/PwaInstallHint";
 
 // ── Status filter tabs ──────────────────────────────────────────────
 
@@ -378,6 +379,9 @@ export default function OrdersPage() {
       <main className="flex-1 p-5 flex flex-col gap-5 pb-24">
         {/* ── Dashboard stats ── */}
         <DeliveryDashboard orders={orders} />
+
+        {/* ── PWA Install Hint ── */}
+        <PwaInstallHint />
 
         {/* ── Offline notice ── */}
         <div className="bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-3 flex items-start gap-3">
