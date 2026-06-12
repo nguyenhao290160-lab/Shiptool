@@ -1,0 +1,238 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  DeliveryOrder,
+  DeliveryStatus,
+  DeliveryPriority,
+} from "@/lib/types";
+
+// ── Option lists ────────────────────────────────────────────────────
+
+const STATUS_OPTIONS: { value: DeliveryStatus; label: string }[] = [
+  { value: "pending", label: "Chờ giao" },
+  { value: "delivering", label: "Đang giao" },
+  { value: "delivered", label: "Đã giao" },
+  { value: "failed", label: "Thất bại" },
+  { value: "cancelled", label: "Đã hủy" },
+];
+
+const PRIORITY_OPTIONS: { value: DeliveryPriority; label: string }[] = [
+  { value: "high", label: "Cao" },
+  { value: "normal", label: "Bình thường" },
+  { value: "low", label: "Thấp" },
+];
+
+// ── Props ───────────────────────────────────────────────────────────
+
+interface Props {
+  /** If provided the form is in edit mode */
+  initial?: DeliveryOrder;
+  onSave: (order: DeliveryOrder) => void;
+  onCancel: () => void;
+}
+
+// ── Component ───────────────────────────────────────────────────────
+
+export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
+  const isEdit = !!initial;
+
+  const [customerName, setCustomerName] = useState(initial?.customerName ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [address, setAddress] = useState(initial?.address ?? "");
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [status, setStatus] = useState<DeliveryStatus>(
+    initial?.status ?? "pending"
+  );
+  const [priority, setPriority] = useState<DeliveryPriority>(
+    initial?.priority ?? "normal"
+  );
+
+  // Reset when initial changes (e.g. switching from one edit to another)
+  useEffect(() => {
+    if (initial) {
+      setCustomerName(initial.customerName);
+      setPhone(initial.phone);
+      setAddress(initial.address);
+      setNote(initial.note);
+      setStatus(initial.status);
+      setPriority(initial.priority);
+    }
+  }, [initial]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerName.trim() || !address.trim()) return;
+
+    const now = new Date().toISOString();
+    const order: DeliveryOrder = {
+      id: initial?.id ?? Date.now().toString(),
+      customerName: customerName.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      note: note.trim(),
+      status,
+      priority,
+      lat: initial?.lat,
+      lng: initial?.lng,
+      createdAt: initial?.createdAt ?? now,
+      updatedAt: now,
+    };
+    onSave(order);
+  };
+
+  // ── Shared input styles ───────────────────────────────────────────
+
+  const inputClass =
+    "w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900 bg-white " +
+    "focus:ring-4 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all " +
+    "placeholder:text-slate-400 font-medium";
+
+  const labelClass = "block text-sm font-bold text-slate-700 mb-1.5";
+
+  return (
+    /* Overlay backdrop */
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-slide-up"
+      >
+        {/* ── Header ── */}
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <h2 className="text-xl font-bold text-slate-900">
+            {isEdit ? "Chỉnh sửa đơn giao" : "Thêm đơn giao mới"}
+          </h2>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* ── Body (scrollable) ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+          {/* Customer name */}
+          <div>
+            <label className={labelClass}>
+              Tên khách hàng <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              className={inputClass}
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="VD: Nguyễn Văn A"
+              required
+              autoFocus
+            />
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className={labelClass}>Số điện thoại</label>
+            <input
+              type="tel"
+              className={inputClass}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="VD: 0901234567"
+            />
+          </div>
+
+          {/* Address */}
+          <div>
+            <label className={labelClass}>
+              Địa chỉ <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className={inputClass + " resize-none"}
+              rows={2}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="VD: 12 Nguyễn Huệ, Quận 1, TP.HCM"
+              required
+            />
+          </div>
+
+          {/* Note */}
+          <div>
+            <label className={labelClass}>Ghi chú</label>
+            <textarea
+              className={inputClass + " resize-none"}
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="VD: Giao trước 10h, gọi trước khi đến"
+            />
+          </div>
+
+          {/* Status + Priority row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Trạng thái</label>
+              <select
+                className={inputClass}
+                value={status}
+                onChange={(e) => setStatus(e.target.value as DeliveryStatus)}
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Mức ưu tiên</label>
+              <select
+                className={inputClass}
+                value={priority}
+                onChange={(e) =>
+                  setPriority(e.target.value as DeliveryPriority)
+                }
+              >
+                {PRIORITY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Footer buttons ── */}
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            className="flex-1 py-3 rounded-xl bg-cyan-600 text-white font-bold hover:bg-cyan-700 active:bg-cyan-800 transition-colors shadow-sm shadow-cyan-600/20"
+          >
+            {isEdit ? "Cập nhật" : "Thêm đơn"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};

@@ -1,0 +1,21 @@
+{
+  "name": "ShipRoute AI",
+  "short_name": "ShipRoute",
+  "description": "Trợ lý sắp tuyến giao hàng dành cho shipper",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ea580c",
+  "icons": [
+    {
+      "src": "/window.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/window.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
