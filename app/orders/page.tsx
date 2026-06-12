@@ -9,6 +9,8 @@ import {
   saveDeliveryOrder,
   deleteDeliveryOrder,
 } from "@/lib/deliveryStorage";
+import { geocodeAddress } from "@/lib/geocoding";
+import { getGoogleMapsApiKey, isOnline } from "@/lib/mapUtils";
 import { DeliveryDashboard } from "@/components/DeliveryDashboard";
 import { DeliveryOrderCard } from "@/components/DeliveryOrderCard";
 import { DeliveryOrderForm } from "@/components/DeliveryOrderForm";
@@ -38,6 +40,9 @@ export default function OrdersPage() {
     undefined
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [geocodingLoading, setGeocodingLoading] = useState<Set<string>>(new Set());
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [batchResult, setBatchResult] = useState<{ success: number; error: number } | null>(null);
 
   // ── Initialise (hydration-safe) ───────────────────────────────────
 
@@ -86,6 +91,153 @@ export default function OrdersPage() {
   const handleAddNew = () => {
     setEditingOrder(undefined);
     setShowForm(true);
+  };
+
+  // ── Geocoding handlers ──────────────────────────────────────────────
+
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (msg.includes("Zero results") || msg.includes("ZERO_RESULTS")) {
+        return "Không tìm thấy tọa độ cho địa chỉ này";
+      }
+      if (msg.includes("API key") || msg.includes("INVALID_REQUEST")) {
+        return "Chưa cấu hình Google Maps API key";
+      }
+      if (msg.includes("OVER_QUERY_LIMIT")) {
+        return "Google Geocoding API đang bị giới hạn, vui lòng thử lại";
+      }
+      return msg;
+    }
+    return "Lỗi không xác định khi lấy tọa độ";
+  };
+
+  const handleGeocodeOrder = async (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    if (!order.address?.trim()) {
+      alert("Đơn này chưa có địa chỉ");
+      return;
+    }
+
+    if (!isOnline()) {
+      alert("Bạn đang offline, không thể lấy tọa độ");
+      return;
+    }
+
+    const apiKey = getGoogleMapsApiKey();
+    if (!apiKey) {
+      alert("Chưa cấu hình Google Maps API key");
+      return;
+    }
+
+    setGeocodingLoading((prev) => new Set(prev).add(orderId));
+
+    try {
+      const result = await geocodeAddress(order.address, apiKey);
+      const updatedOrder: DeliveryOrder = {
+        ...order,
+        lat: result.lat,
+        lng: result.lng,
+        geocodedAddress: result.formattedAddress,
+        placeId: result.placeId,
+        geocodingStatus: "success",
+        geocodingError: undefined,
+        updatedAt: new Date().toISOString(),
+      };
+      saveDeliveryOrder(updatedOrder);
+      refresh();
+    } catch (error) {
+      const errorMsg = getErrorMessage(error);
+      const updatedOrder: DeliveryOrder = {
+        ...order,
+        geocodingStatus: "error",
+        geocodingError: errorMsg,
+        updatedAt: new Date().toISOString(),
+      };
+      saveDeliveryOrder(updatedOrder);
+      refresh();
+    } finally {
+      setGeocodingLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+    }
+  };
+
+  const handleGeocodeMissingOrders = async () => {
+    const apiKey = getGoogleMapsApiKey();
+    if (!apiKey) {
+      alert("Chưa cấu hình Google Maps API key");
+      return;
+    }
+
+    if (!isOnline()) {
+      alert("Bạn đang offline, không thể lấy tọa độ hàng loạt");
+      return;
+    }
+
+    const missingOrders = orders.filter(
+      (o) => o.address?.trim() && !o.lat && !o.lng
+    );
+
+    if (missingOrders.length === 0) {
+      alert("Tất cả đơn đều đã có tọa độ rồi");
+      return;
+    }
+
+    if (!confirm(`Lấy tọa độ cho ${missingOrders.length} đơn? Quá trình này có thể mất vài phút.`)) {
+      return;
+    }
+
+    setBatchProgress({ current: 0, total: missingOrders.length });
+    setBatchResult(null);
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Add all orders to loading state
+    setGeocodingLoading(new Set(missingOrders.map((o) => o.id)));
+
+    for (let i = 0; i < missingOrders.length; i++) {
+      const order = missingOrders[i];
+      setBatchProgress({ current: i + 1, total: missingOrders.length });
+
+      try {
+        const result = await geocodeAddress(order.address, apiKey);
+        const updatedOrder: DeliveryOrder = {
+          ...order,
+          lat: result.lat,
+          lng: result.lng,
+          geocodedAddress: result.formattedAddress,
+          placeId: result.placeId,
+          geocodingStatus: "success",
+          geocodingError: undefined,
+          updatedAt: new Date().toISOString(),
+        };
+        saveDeliveryOrder(updatedOrder);
+        successCount++;
+      } catch (error) {
+        const errorMsg = getErrorMessage(error);
+        const updatedOrder: DeliveryOrder = {
+          ...order,
+          geocodingStatus: "error",
+          geocodingError: errorMsg,
+          updatedAt: new Date().toISOString(),
+        };
+        saveDeliveryOrder(updatedOrder);
+        errorCount++;
+      }
+
+      // Small delay to avoid API rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    refresh();
+    setGeocodingLoading(new Set());
+    setBatchProgress(null);
+    setBatchResult({ success: successCount, error: errorCount });
   };
 
   // ── Filtered + searched list ──────────────────────────────────────
@@ -284,6 +436,54 @@ export default function OrdersPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
+            {/* Batch geocoding section */}
+            {orders.some((o) => o.address?.trim() && !o.lat && !o.lng) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 text-blue-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    />
+                  </svg>
+                  <div className="text-sm text-blue-800 font-medium">
+                    {batchProgress ? (
+                      <>Đang xử lý {batchProgress.current}/{batchProgress.total} đơn</>
+                    ) : batchResult ? (
+                      <>Thành công: {batchResult.success}, Lỗi: {batchResult.error}</>
+                    ) : (
+                      <>Có {orders.filter((o) => o.address?.trim() && !o.lat && !o.lng).length} đơn chưa có tọa độ</>
+                    )}
+                  </div>
+                </div>
+                {!batchProgress && (
+                  <button
+                    onClick={handleGeocodeMissingOrders}
+                    disabled={batchResult !== null}
+                    className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {batchResult ? "Xong" : "Lấy tọa độ cho tất cả"}
+                  </button>
+                )}
+                {batchResult && (
+                  <button
+                    onClick={() => setBatchResult(null)}
+                    className="text-xs font-bold text-slate-600 hover:text-slate-800 px-2 py-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+
             {filteredOrders.map((order) => (
               <DeliveryOrderCard
                 key={order.id}
@@ -291,6 +491,8 @@ export default function OrdersPage() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onStatusChange={handleStatusChange}
+                onGeocode={handleGeocodeOrder}
+                geocodingLoading={geocodingLoading}
               />
             ))}
           </div>

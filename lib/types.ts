@@ -41,10 +41,18 @@ export interface DeliveryOrder {
   note: string;
   status: DeliveryStatus;
   priority: DeliveryPriority;
-  /** Latitude – will be populated when Google Maps is integrated */
+  /** Latitude – can be set manually or via geocoding */
   lat?: number;
-  /** Longitude – will be populated when Google Maps is integrated */
+  /** Longitude – can be set manually or via geocoding */
   lng?: number;
+  /** Formatted address from geocoding API */
+  geocodedAddress?: string;
+  /** Place ID from Google geocoding */
+  placeId?: string;
+  /** Geocoding status: idle, loading, success, error */
+  geocodingStatus?: "idle" | "loading" | "success" | "error";
+  /** Geocoding error message if any */
+  geocodingError?: string;
   createdAt: string;
   updatedAt: string;
 }

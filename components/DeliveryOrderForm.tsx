@@ -47,11 +47,68 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
   const [priority, setPriority] = useState<DeliveryPriority>(
     initial?.priority ?? "normal"
   );
+  const [lat, setLat] = useState<string>(initial?.lat?.toString() ?? "");
+  const [lng, setLng] = useState<string>(initial?.lng?.toString() ?? "");
+  const [latError, setLatError] = useState("");
+  const [lngError, setLngError] = useState("");
+
+  // Validate and parse latitude
+  const handleLatChange = (value: string) => {
+    setLat(value);
+    if (!value.trim()) {
+      setLatError("");
+      return;
+    }
+    const parsed = parseFloat(value);
+    if (isNaN(parsed) || parsed < -90 || parsed > 90) {
+      setLatError("Vĩ độ phải từ -90 đến 90");
+    } else {
+      setLatError("");
+    }
+  };
+
+  // Validate and parse longitude
+  const handleLngChange = (value: string) => {
+    setLng(value);
+    if (!value.trim()) {
+      setLngError("");
+      return;
+    }
+    const parsed = parseFloat(value);
+    if (isNaN(parsed) || parsed < -180 || parsed > 180) {
+      setLngError("Kinh độ phải từ -180 đến 180");
+    } else {
+      setLngError("");
+    }
+  };
+
+  // Parse coordinates for submission
+  const parseCoordinates = () => {
+    let parsedLat: number | undefined;
+    let parsedLng: number | undefined;
+
+    if (lat.trim()) {
+      const latNum = parseFloat(lat);
+      if (!isNaN(latNum) && latNum >= -90 && latNum <= 90) {
+        parsedLat = latNum;
+      }
+    }
+
+    if (lng.trim()) {
+      const lngNum = parseFloat(lng);
+      if (!isNaN(lngNum) && lngNum >= -180 && lngNum <= 180) {
+        parsedLng = lngNum;
+      }
+    }
+
+    return { parsedLat, parsedLng };
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim() || !address.trim()) return;
 
+    const { parsedLat, parsedLng } = parseCoordinates();
     const now = new Date().toISOString();
     const order: DeliveryOrder = {
       id: initial?.id ?? Date.now().toString(),
@@ -61,8 +118,12 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
       note: note.trim(),
       status,
       priority,
-      lat: initial?.lat,
-      lng: initial?.lng,
+      lat: parsedLat ?? initial?.lat,
+      lng: parsedLng ?? initial?.lng,
+      geocodedAddress: initial?.geocodedAddress,
+      placeId: initial?.placeId,
+      geocodingStatus: initial?.geocodingStatus,
+      geocodingError: initial?.geocodingError,
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     };
@@ -202,6 +263,60 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* ── Advanced Coordinates Section ── */}
+        <div className="border-t border-slate-100 px-6 py-4">
+          <details className="group">
+            <summary className="cursor-pointer font-bold text-sm text-slate-700 hover:text-slate-900 transition-colors list-none flex items-center gap-2">
+              <span className="inline-flex w-5 h-5 items-center justify-center rounded border border-slate-300 group-open:bg-slate-100 transition-colors">
+                <span className="text-xs font-bold text-slate-600">+</span>
+              </span>
+              Thông tin tọa độ nâng cao
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {/* Latitude */}
+              <div>
+                <label className={labelClass}>Vĩ độ (Lat)</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  className={
+                    inputClass +
+                    (latError ? " border-red-500 focus:border-red-500 focus:ring-red-500/20" : "")
+                  }
+                  value={lat}
+                  onChange={(e) => handleLatChange(e.target.value)}
+                  placeholder="-90 đến 90"
+                />
+                {latError && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">{latError}</p>
+                )}
+              </div>
+
+              {/* Longitude */}
+              <div>
+                <label className={labelClass}>Kinh độ (Lng)</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  className={
+                    inputClass +
+                    (lngError ? " border-red-500 focus:border-red-500 focus:ring-red-500/20" : "")
+                  }
+                  value={lng}
+                  onChange={(e) => handleLngChange(e.target.value)}
+                  placeholder="-180 đến 180"
+                />
+                {lngError && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">{lngError}</p>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Để trống nếu không có thông tin tọa độ
+            </p>
+          </details>
         </div>
 
         {/* ── Footer buttons ── */}

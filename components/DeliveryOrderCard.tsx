@@ -67,6 +67,8 @@ interface Props {
   onEdit: (order: DeliveryOrder) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: DeliveryStatus) => void;
+  onGeocode?: (id: string) => Promise<void>;
+  geocodingLoading?: Set<string>;
 }
 
 export const DeliveryOrderCard = ({
@@ -74,6 +76,8 @@ export const DeliveryOrderCard = ({
   onEdit,
   onDelete,
   onStatusChange,
+  onGeocode,
+  geocodingLoading,
 }: Props) => {
   const st = STATUS_CFG[order.status];
   const pr = PRIORITY_CFG[order.priority];
@@ -172,44 +176,105 @@ export const DeliveryOrderCard = ({
       )}
 
       {/* ── Footer: status + actions ── */}
-      <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        {/* Quick-toggle status */}
-        <button
-          onClick={handleQuickStatus}
-          title="Nhấn để đổi trạng thái nhanh"
-          className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors cursor-pointer ${st.bg} ${st.text}`}
-        >
-          <span className={`w-2 h-2 rounded-full ${st.dot}`} />
-          {st.label}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-3 w-3 opacity-60"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={3}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
+      <div className="px-5 py-3 border-t border-slate-100 flex flex-col gap-3">
+        {/* Coordinates status */}
+        {(order.lat !== undefined || order.lng !== undefined || order.geocodingStatus) && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3.5 w-3.5 text-cyan-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+              </svg>
+              {order.geocodingStatus === "loading" && (
+                <span className="text-slate-600 font-medium animate-pulse">Đang lấy tọa độ...</span>
+              )}
+              {order.geocodingStatus === "success" && order.lat && order.lng && (
+                <span className="text-emerald-600 font-medium">
+                  {order.lat.toFixed(4)}, {order.lng.toFixed(4)}
+                </span>
+              )}
+              {order.geocodingStatus === "error" && (
+                <span title={order.geocodingError} className="text-red-600 font-medium cursor-help">
+                  Lỗi lấy tọa độ
+                </span>
+              )}
+              {!order.geocodingStatus && order.lat && order.lng && (
+                <span className="text-slate-600 font-medium">
+                  {order.lat.toFixed(4)}, {order.lng.toFixed(4)}
+                </span>
+              )}
+              {!order.lat && !order.lng && !order.geocodingStatus && (
+                <span className="text-slate-400 font-medium">Chưa có tọa độ</span>
+              )}
+            </div>
+            {onGeocode && !order.geocodingStatus && (
+              <button
+                onClick={() => onGeocode(order.id)}
+                className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg transition-colors"
+                title="Lấy tọa độ từ địa chỉ"
+              >
+                {order.lat && order.lng ? "Cập nhật" : "Lấy tọa độ"}
+              </button>
+            )}
+            {geocodingLoading?.has(order.id) && (
+              <div className="flex items-center gap-1 animate-spin">
+                <svg className="h-3 w-3 text-blue-600" fill="currentColor" viewBox="0 0 4 4">
+                  <circle cx="2" cy="2" r="2" />
+                </svg>
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          {/* Quick-toggle status */}
           <button
-            onClick={() => onEdit(order)}
-            className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+            onClick={handleQuickStatus}
+            title="Nhấn để đổi trạng thái nhanh"
+            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors cursor-pointer ${st.bg} ${st.text}`}
           >
-            Sửa
+            <span className={`w-2 h-2 rounded-full ${st.dot}`} />
+            {st.label}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3 w-3 opacity-60"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
           </button>
-          <button
-            onClick={() => onDelete(order.id)}
-            className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Xóa
-          </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => onEdit(order)}
+              className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Sửa
+            </button>
+            <button
+              onClick={() => onDelete(order.id)}
+              className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Xóa
+            </button>
+          </div>
         </div>
       </div>
     </div>
