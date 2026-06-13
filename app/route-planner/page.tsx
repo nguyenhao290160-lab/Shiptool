@@ -35,6 +35,16 @@ import { DirectionsPanel } from "@/components/DirectionsPanel";
 import { DistanceMatrixSummary } from "@/lib/distanceMatrix";
 import { OperatingCostCalculator } from "@/components/OperatingCostCalculator";
 
+import { mapGoogleMapsError } from "@/lib/googleMapsErrors";
+import {
+  hasApiKey,
+  validateCoordinates,
+} from "@/lib/mapUtils";
+import { geocodeAddress } from "@/lib/geocoding";
+import { MapStatusPanel } from "@/components/MapStatusPanel";
+import { MapFallback } from "@/components/MapFallback";
+import { GoogleMapLoadStatus } from "@/lib/types";
+
 // ── Helper: convert DeliveryOrder → RoutePoint ──────────────────────
 
 const orderToPoint = (
@@ -138,12 +148,14 @@ export default function RoutePlannerPage() {
     before: { distance: string; duration: string };
     after: { distance: string; duration: string };
   } | null>(null);
+  const [mapStatus, setMapStatus] = useState<GoogleMapLoadStatus>("loading");
+  const [routingMode, setRoutingMode] = useState<"google" | "local-fallback" | "manual">("manual");
   const polylineRef = useRef<unknown>(null);
 
-  // ── Hydration-safe init ───────────────────────────────────────────
+  // ── Hydration-safe init & Google Maps Script Loader ───────────────
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       // Seed demo orders if none exist
       seedDemoOrdersIfEmpty();
 
@@ -153,16 +165,37 @@ export default function RoutePlannerPage() {
         setPlan(saved);
         setStartName(saved.startPoint?.name ?? "");
         setStartAddress(saved.startPoint?.address ?? "");
+        setRoutingMode(saved.routingMode ?? "manual");
       }
 
       // Check if there are eligible orders
       const orders = getDeliveryOrders();
       const eligible = orders.filter(
-        (o) => o.status === "pending" || o.status === "delivering"
+        (o) => o.status === "pending" || o.status === "ready" || o.status === "assigned" || o.status === "delivering"
       );
       setHasExistingOrders(eligible.length > 0);
 
       setIsMounted(true);
+
+      // Check key and load maps script asynchronously outside synchronous hook render cycle
+      if (!hasApiKey()) {
+        setMapStatus("missing-api-key");
+        return;
+      }
+
+      if (!isOnline()) {
+        setMapStatus("offline");
+        return;
+      }
+
+      try {
+        setMapStatus("loading");
+        await loadGoogleMapsScript();
+        setMapStatus("ready");
+      } catch (err) {
+        console.error("Google Maps script load failed:", err);
+        setMapStatus("error");
+      }
     }, 0);
     return () => clearTimeout(timer);
   }, []);
@@ -172,7 +205,7 @@ export default function RoutePlannerPage() {
   const buildRouteFromOrders = useCallback(() => {
     const orders = getDeliveryOrders();
     const eligible = orders.filter(
-      (o) => o.status === "pending" || o.status === "delivering"
+      (o) => o.status === "pending" || o.status === "ready" || o.status === "assigned" || o.status === "delivering"
     );
 
     if (eligible.length === 0) {
@@ -201,10 +234,12 @@ export default function RoutePlannerPage() {
       points: sorted,
       createdAt: now,
       updatedAt: now,
+      routingMode: "manual",
     };
 
     saveRoutePlan(newPlan);
     setPlan(newPlan);
+    setRoutingMode("manual");
     setHasExistingOrders(true);
     setOptimizeMsg(
       "Đã tạo tuyến từ đơn hiện có. Sắp xếp theo ưu tiên và trạng thái."
@@ -219,17 +254,35 @@ export default function RoutePlannerPage() {
     const allCoords = hasAllCoords(plan.points);
 
     if (allCoords) {
+      // Validate all coords values
+      const invalidPoints = plan.points.filter(
+        (p) => !validateCoordinates(p.lat, p.lng)
+      );
+
+      if (invalidPoints.length > 0) {
+        setOptimizeMsg(
+          `Lỗi tọa độ: Điểm "${invalidPoints[0].customerName}" chứa tọa độ không hợp lệ (-90 đến 90 cho Vĩ độ, -180 đến 180 cho Kinh độ).`
+        );
+        return;
+      }
+
       const result = nearestNeighbourSort(
         plan.points,
         plan.startPoint?.lat,
         plan.startPoint?.lng
       );
       if (result) {
-        const updated = { ...plan, points: result };
+        const updated: DeliveryRoutePlan = {
+          ...plan,
+          points: result,
+          routingMode: "local-fallback",
+          updatedAt: new Date().toISOString(),
+        };
         saveRoutePlan(updated);
         setPlan(updated);
+        setRoutingMode("local-fallback");
         setOptimizeMsg(
-          "Đang dùng thuật toán local đơn giản để gợi ý thứ tự giao."
+          "Đang dùng thuật toán local lân cận (Nearest Neighbour) để gợi ý thứ tự giao."
         );
         return;
       }
@@ -237,11 +290,17 @@ export default function RoutePlannerPage() {
 
     // Fallback
     const sorted = fallbackSort(plan.points);
-    const updated = { ...plan, points: sorted };
+    const updated: DeliveryRoutePlan = {
+      ...plan,
+      points: sorted,
+      routingMode: "local-fallback",
+      updatedAt: new Date().toISOString(),
+    };
     saveRoutePlan(updated);
     setPlan(updated);
+    setRoutingMode("local-fallback");
     setOptimizeMsg(
-      "Chưa có tọa độ, hệ thống đang sắp xếp theo ưu tiên và trạng thái. Prompt sau sẽ gắn Google Maps để tính tuyến chính xác hơn."
+      "Đang dùng thuật toán sắp xếp theo mức ưu tiên và trạng thái (Local Fallback)."
     );
   }, [plan]);
 
@@ -255,7 +314,7 @@ export default function RoutePlannerPage() {
 
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      setDistanceMatrixError("Chưa cấu hình Google Maps API key.");
+      setDistanceMatrixError("Chưa cấu hình Google Maps API key. Vui lòng kiểm tra Cài đặt.");
       return;
     }
 
@@ -266,10 +325,20 @@ export default function RoutePlannerPage() {
       return;
     }
 
-    // Check if all points have coordinates
+    // Check if all points have coordinates and validate them
     const allCoords = hasAllCoords(plan.points);
     if (!allCoords) {
-      setDistanceMatrixError("Có đơn chưa có tọa độ. Hãy dùng chức năng Lấy tọa độ trước.");
+      setDistanceMatrixError("Có đơn chưa có tọa độ. Hãy dùng chức năng Lấy tọa độ tại mục Đơn giao trước.");
+      return;
+    }
+
+    const invalidPoints = plan.points.filter(
+      (p) => !validateCoordinates(p.lat, p.lng)
+    );
+    if (invalidPoints.length > 0) {
+      setDistanceMatrixError(
+        `Lỗi tọa độ: Điểm "${invalidPoints[0].customerName}" chứa tọa độ không hợp lệ (-90 đến 90 cho Vĩ độ, -180 đến 180 cho Kinh độ).`
+      );
       return;
     }
 
@@ -280,6 +349,29 @@ export default function RoutePlannerPage() {
 
       // Ensure Google Maps script is loaded
       await loadGoogleMapsScript();
+
+      // Geocode start point address on-the-fly if needed
+      let startWithCoords = plan.startPoint;
+      if (startAddress.trim()) {
+        const isCoordsValid = plan.startPoint && validateCoordinates(plan.startPoint.lat, plan.startPoint.lng);
+        const isAddressChanged = !plan.startPoint || plan.startPoint.address !== startAddress.trim();
+        
+        if (isAddressChanged || !isCoordsValid) {
+          setOptimizeMsg("Đang tìm tọa độ cho điểm bắt đầu...");
+          try {
+            const geoResult = await geocodeAddress(startAddress, apiKey);
+            startWithCoords = {
+              name: startName.trim() || "Điểm bắt đầu",
+              address: geoResult.formattedAddress,
+              lat: geoResult.lat,
+              lng: geoResult.lng,
+            };
+          } catch (err) {
+            const parsed = mapGoogleMapsError(err);
+            throw new Error(`Điểm xuất phát: ${parsed.message} (${parsed.fix})`);
+          }
+        }
+      }
 
       // Calculate current route totals (before optimization)
       const beforeStats = calculateRouteTotalsFromMatrix(
@@ -294,14 +386,14 @@ export default function RoutePlannerPage() {
 
       // Calculate Distance Matrix
       const matrix = await calculateDistanceMatrix(
-        plan.startPoint,
+        startWithCoords,
         plan.points,
         apiKey
       );
 
       if (matrix.validCellCount === 0) {
         setDistanceMatrixError(
-          "Không thể tính khoảng cách giữa các điểm giao. Google Distance Matrix API có thể đang lỗi hoặc bị giới hạn."
+          "Không thể tính khoảng cách giữa các điểm giao. Vui lòng kiểm tra lại dịch vụ Google Distance Matrix API."
         );
         setDistanceMatrixLoading(false);
         return;
@@ -321,16 +413,19 @@ export default function RoutePlannerPage() {
         optimizedPoints.map((p) => p.orderId)
       );
 
-      // Update plan with optimized points
+      // Update plan with optimized points and routingMode
       const now = new Date().toISOString();
       const updated: DeliveryRoutePlan = {
         ...plan,
+        startPoint: startWithCoords,
         points: optimizedPoints,
+        routingMode: "google",
         updatedAt: now,
       };
 
       saveRoutePlan(updated);
       setPlan(updated);
+      setRoutingMode("google");
 
       // Set optimization stats for display
       setOptimizeStats({
@@ -344,17 +439,14 @@ export default function RoutePlannerPage() {
         },
       });
 
-      setOptimizeMsg("Đã tối ưu tuyến bằng Google Distance Matrix!");
+      setOptimizeMsg("Đã tối ưu tuyến đường thành công bằng Google Distance Matrix!");
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Không thể tối ưu tuyến. Google Distance Matrix API có thể đang lỗi hoặc bị giới hạn.";
-      setDistanceMatrixError(message);
+      const parsed = mapGoogleMapsError(err);
+      setDistanceMatrixError(`${parsed.title}: ${parsed.message} (${parsed.fix})`);
     } finally {
       setDistanceMatrixLoading(false);
     }
-  }, [plan]);
+  }, [plan, startAddress, startName]);
 
   // ── Reset order ───────────────────────────────────────────────────
 
@@ -363,9 +455,15 @@ export default function RoutePlannerPage() {
     const reset = plan.points.map((p, i) => ({ ...p, sequence: i + 1 }));
     // Re-apply fallback sort
     const sorted = fallbackSort(reset);
-    const updated = { ...plan, points: sorted };
+    const updated: DeliveryRoutePlan = {
+      ...plan,
+      points: sorted,
+      routingMode: "manual",
+      updatedAt: new Date().toISOString()
+    };
     saveRoutePlan(updated);
     setPlan(updated);
+    setRoutingMode("manual");
     setOptimizeMsg("Đã reset thứ tự về mặc định.");
   }, [plan]);
 
@@ -375,6 +473,7 @@ export default function RoutePlannerPage() {
     if (!confirm("Bạn có chắc muốn xóa tuyến hiện tại?")) return;
     deleteRoutePlan();
     setPlan(null);
+    setRoutingMode("manual");
     setOptimizeMsg("");
   }, []);
 
@@ -387,49 +486,64 @@ export default function RoutePlannerPage() {
         ? {
             name: startName.trim() || "Điểm bắt đầu",
             address: startAddress.trim(),
+            lat: plan.startPoint?.lat,
+            lng: plan.startPoint?.lng,
           }
         : undefined;
 
-    const updated = { ...plan, startPoint };
+    const updated: DeliveryRoutePlan = {
+      ...plan,
+      startPoint,
+      routingMode,
+      updatedAt: new Date().toISOString(),
+    };
     saveRoutePlan(updated);
     setPlan(updated);
     setOptimizeMsg("Đã lưu tuyến thành công!");
-  }, [plan, startName, startAddress]);
+  }, [plan, startName, startAddress, routingMode]);
 
   const handleSaveToHistory = useCallback(() => {
     if (!plan) return;
+    if (plan.points.length === 0) {
+      alert("Không thể lưu lịch sử cho tuyến đường rỗng.");
+      return;
+    }
     if (!confirm("Bạn có muốn lưu tuyến hiện tại vào lịch sử không?")) return;
 
     const name = window.prompt("Tên tuyến (ví dụ: Tuyến sáng hôm nay)", plan.name) || plan.name;
     const note = window.prompt("Ghi chú ngắn (tùy chọn)", "") || undefined;
 
-    // Try to extract simple distance/duration text from optimizeStats if present
-    const distanceText = (optimizeStats && optimizeStats.after?.distance) || undefined;
-    const durationText = (optimizeStats && optimizeStats.after?.duration) || undefined;
+    // Try to extract simple distance/duration text from optimizeStats or directions if present
+    const distanceText = (optimizeStats && optimizeStats.after?.distance) || (directions && directions.totalDistance) || undefined;
+    const durationText = (optimizeStats && optimizeStats.after?.duration) || (directions && directions.totalDuration) || undefined;
 
-    createHistoryFromRoutePlan(plan, {
-      name,
-      note,
-      status: "completed",
-      distanceText,
-      durationText,
-      optimizedBy: "local",
-    });
-
-    // mark plan as completed
-    const updatedPlan: DeliveryRoutePlan = { ...(plan as DeliveryRoutePlan), updatedAt: new Date().toISOString(), name };
-    // If route saving function exists, persist
     try {
-      // saveRoutePlan may be imported above; reuse existing handleSaveRoute behavior
-      // but to avoid duplicate code, call existing save
+      createHistoryFromRoutePlan(plan, {
+        name,
+        note,
+        status: "completed",
+        distanceText,
+        durationText,
+        optimizedBy: routingMode,
+      });
+
+      // mark plan as completed
+      const updatedPlan: DeliveryRoutePlan = {
+        ...plan,
+        updatedAt: new Date().toISOString(),
+        name,
+        routingMode
+      };
+      
       saveRoutePlan(updatedPlan);
       setPlan(updatedPlan);
+      alert("Đã lưu tuyến vào lịch sử thành công!");
+      setOptimizeMsg("Đã lưu vào lịch sử tuyến");
     } catch (err) {
-      console.warn("Failed to update plan after saving history", err);
+      console.error("Save to history error:", err);
+      alert("Lưu lịch sử tuyến thất bại: " + (err instanceof Error ? err.message : String(err)));
     }
-
-    setOptimizeMsg("Đã lưu vào lịch sử tuyến");
-  }, [plan, optimizeStats]);
+  }, [plan, optimizeStats, directions, routingMode]);
 
   // ── Move helpers ──────────────────────────────────────────────────
 
@@ -439,9 +553,15 @@ export default function RoutePlannerPage() {
     const [item] = pts.splice(fromIdx, 1);
     pts.splice(toIdx, 0, item);
     const reseq = pts.map((p, i) => ({ ...p, sequence: i + 1 }));
-    const updated = { ...plan, points: reseq };
+    const updated: DeliveryRoutePlan = {
+      ...plan,
+      points: reseq,
+      routingMode: "manual",
+      updatedAt: new Date().toISOString(),
+    };
     saveRoutePlan(updated);
     setPlan(updated);
+    setRoutingMode("manual");
   };
 
   // ── Draw directions on map ────────────────────────────────────────
@@ -454,7 +574,7 @@ export default function RoutePlannerPage() {
 
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      setDirectionsError("Chưa cấu hình Google Maps API key.");
+      setDirectionsError("Chưa cấu hình Google Maps API key. Vui lòng cấu hình trong Cài đặt.");
       return;
     }
 
@@ -463,10 +583,20 @@ export default function RoutePlannerPage() {
       return;
     }
 
-    // Validate all points have coordinates
+    // Validate all points have coordinates and check ranges
     const validation = validateRouteCoordinates(plan.startPoint, plan.points);
     if (!validation.valid) {
       setDirectionsError(validation.message || "Một số điểm chưa có tọa độ.");
+      return;
+    }
+
+    const invalidPoints = plan.points.filter(
+      (p) => !validateCoordinates(p.lat, p.lng)
+    );
+    if (invalidPoints.length > 0) {
+      setDirectionsError(
+        `Lỗi tọa độ: Điểm "${invalidPoints[0].customerName}" chứa tọa độ không hợp lệ (-90 đến 90 cho Vĩ độ, -180 đến 180 cho Kinh độ).`
+      );
       return;
     }
 
@@ -477,8 +607,42 @@ export default function RoutePlannerPage() {
       // Ensure Google Maps script is loaded
       await loadGoogleMapsScript();
 
+      // Geocode start point address on-the-fly if needed
+      let startWithCoords = plan.startPoint;
+      if (startAddress.trim()) {
+        const isCoordsValid = plan.startPoint && validateCoordinates(plan.startPoint.lat, plan.startPoint.lng);
+        const isAddressChanged = !plan.startPoint || plan.startPoint.address !== startAddress.trim();
+        
+        if (isAddressChanged || !isCoordsValid) {
+          setOptimizeMsg("Đang tìm tọa độ cho điểm bắt đầu...");
+          try {
+            const geoResult = await geocodeAddress(startAddress, apiKey);
+            startWithCoords = {
+              name: startName.trim() || "Điểm bắt đầu",
+              address: geoResult.formattedAddress,
+              lat: geoResult.lat,
+              lng: geoResult.lng,
+            };
+          } catch (err) {
+            const parsed = mapGoogleMapsError(err);
+            throw new Error(`Điểm xuất phát: ${parsed.message} (${parsed.fix})`);
+          }
+        }
+      }
+
+      // Update plan with start point coordinates if updated
+      if (startWithCoords && JSON.stringify(startWithCoords) !== JSON.stringify(plan.startPoint)) {
+        const updated: DeliveryRoutePlan = {
+          ...plan,
+          startPoint: startWithCoords,
+          updatedAt: new Date().toISOString()
+        };
+        saveRoutePlan(updated);
+        setPlan(updated);
+      }
+
       // Extract origin, destination, waypoints
-      const { origin, destination, waypoints } = extractRouteWaypoints(plan.startPoint, plan.points);
+      const { origin, destination, waypoints } = extractRouteWaypoints(startWithCoords, plan.points);
 
       if (!origin || !destination) {
         setDirectionsError("Không thể xác định điểm bắt đầu hoặc kết thúc.");
@@ -491,17 +655,15 @@ export default function RoutePlannerPage() {
 
       setDirections(result);
       setDirectionsError(null);
+      setRoutingMode("google");
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Không thể vẽ tuyến đường. Google Directions API có thể đang lỗi hoặc bị giới hạn.";
-      setDirectionsError(message);
+      const parsed = mapGoogleMapsError(err);
+      setDirectionsError(`${parsed.title}: ${parsed.message} (${parsed.fix})`);
       setDirections(null);
     } finally {
       setDirectionsLoading(false);
     }
-  }, [plan]);
+  }, [plan, startAddress, startName]);
 
   const handleRenderPolyline = useCallback(async () => {
     if (!directions || !directions.polyline) return;
@@ -617,6 +779,20 @@ export default function RoutePlannerPage() {
 
       {/* ── Main content ── */}
       <main className="flex-1 p-5 flex flex-col gap-5 pb-24">
+        {/* ── Map status and Fallback ── */}
+        <MapStatusPanel
+          status={mapStatus}
+          isOnline={isOnline()}
+          hasApiKey={hasApiKey()}
+          markerCount={plan ? plan.points.filter((p) => p.lat != null && p.lng != null).length : 0}
+          missingCoordsCount={plan ? plan.points.filter((p) => p.lat == null || p.lng == null).length : 0}
+          totalOrders={plan ? plan.points.length : 0}
+        />
+
+        {mapStatus !== "ready" && plan && (
+          <MapFallback status={mapStatus} />
+        )}
+
         {/* ── Start point input ── */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
@@ -656,7 +832,7 @@ export default function RoutePlannerPage() {
           <button
             onClick={buildRouteFromOrders}
             disabled={!hasExistingOrders && !plan}
-            className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white py-3 h-10 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -802,7 +978,7 @@ export default function RoutePlannerPage() {
         {plan && (
           <button
             onClick={handleDeleteRoute}
-            className="text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
+            className="text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1.5"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -835,7 +1011,43 @@ export default function RoutePlannerPage() {
         {/* ── Route plan content ── */}
         {plan ? (
           <>
-            {/* Stats */}
+            {/* Premium Route Summary Card */}
+            <div className="flex flex-col gap-2.5 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
+                <span>Thông tin tuyến đường</span>
+                <span className={`px-2.5 py-0.5 rounded text-[10px] ${
+                  routingMode === "google"
+                    ? "bg-purple-100 text-purple-800 border border-purple-200"
+                    : routingMode === "local-fallback"
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                    : "bg-slate-100 text-slate-800 border border-slate-200"
+                }`}>
+                  {routingMode === "google" && "Chế độ: Google Maps"}
+                  {routingMode === "local-fallback" && "Chế độ: Lân cận local"}
+                  {routingMode === "manual" && "Chế độ: Thủ công"}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Điểm giao</p>
+                  <p className="text-base font-black text-slate-800">{plan.points.length} chặng</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Quãng đường</p>
+                  <p className="text-base font-black text-slate-800">
+                    {directions?.totalDistance || (optimizeStats && optimizeStats.after?.distance) || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Thời gian</p>
+                  <p className="text-base font-black text-slate-800">
+                    {directions?.totalDuration || (optimizeStats && optimizeStats.after?.duration) || "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
             <RouteStats points={plan.points} startPoint={plan.startPoint} />
 
             {/* ── Operating Cost Calculator (Prompt 15) ── */}
@@ -880,14 +1092,33 @@ export default function RoutePlannerPage() {
               )}
             </button>
 
+            {/* Directions Loading Skeleton */}
+            {directionsLoading && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4 animate-pulse">
+                <div className="h-4 bg-slate-200 rounded w-1/4" />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="h-16 bg-slate-100 rounded-xl" />
+                  <div className="h-16 bg-slate-100 rounded-xl" />
+                  <div className="h-16 bg-slate-100 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-slate-200 rounded w-1/2" />
+                  <div className="h-12 bg-slate-100 rounded-lg animate-pulse" />
+                  <div className="h-12 bg-slate-100 rounded-lg animate-pulse" />
+                </div>
+              </div>
+            )}
+
             {/* Directions panel */}
-            <DirectionsPanel
-              directions={directions}
-              isLoading={directionsLoading}
-              error={directionsError}
-              onDrawRoute={handleRenderPolyline}
-              onClearRoute={handleClearRoute}
-            />
+            {!directionsLoading && (
+              <DirectionsPanel
+                directions={directions}
+                isLoading={directionsLoading}
+                error={directionsError}
+                onDrawRoute={handleRenderPolyline}
+                onClearRoute={handleClearRoute}
+              />
+            )}
 
             {/* Coordinate status */}
             {coordMsg && (

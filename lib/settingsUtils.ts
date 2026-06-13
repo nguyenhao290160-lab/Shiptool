@@ -72,7 +72,7 @@ export function getDeliveryOrdersCount(): number {
 export function getRoutePlansCount(): number {
   if (typeof window === "undefined") return 0;
   try {
-    const routes = localStorage.getItem("shiproute_route_plan");
+    const routes = localStorage.getItem("shiproute_routes");
     if (!routes) return 0;
     const parsed = JSON.parse(routes);
     return Array.isArray(parsed) ? parsed.length : 0;

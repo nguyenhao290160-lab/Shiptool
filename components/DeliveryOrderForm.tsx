@@ -3,12 +3,15 @@
 import React, { useState } from "react";
 import { FrequentCustomer, DeliveryOrder, DeliveryStatus, DeliveryPriority } from "@/lib/types";
 import { upsertFrequentCustomerFromOrder } from "@/lib/customerStorage";
+import { getDeliveryOrders } from "@/lib/deliveryStorage";
 import { CustomerSuggestions } from "./CustomerSuggestions";
 
 // ── Option lists ────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: { value: DeliveryStatus; label: string }[] = [
   { value: "pending", label: "Chờ giao" },
+  { value: "ready", label: "Sẵn sàng" },
+  { value: "assigned", label: "Đã xếp tuyến" },
   { value: "delivering", label: "Đang giao" },
   { value: "delivered", label: "Đã giao" },
   { value: "failed", label: "Thất bại" },
@@ -39,6 +42,7 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [note, setNote] = useState(initial?.note ?? "");
+  const [deliveryWindow, setDeliveryWindow] = useState(initial?.deliveryWindow ?? "");
   const [status, setStatus] = useState<DeliveryStatus>(
     initial?.status ?? "pending"
   );
@@ -50,6 +54,22 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
   const [latError, setLatError] = useState("");
   const [lngError, setLngError] = useState("");
   const [saveCustomer, setSaveCustomer] = useState<boolean>(true);
+
+  // Check for duplicate orders locally
+  const isDuplicate = React.useMemo(() => {
+    if (!address.trim() || !customerName.trim()) return false;
+    try {
+      const all = getDeliveryOrders();
+      return all.some(
+        (o) =>
+          o.id !== initial?.id &&
+          ((o.phone && phone && o.phone.trim() === phone.trim() && o.address.trim().toLowerCase() === address.trim().toLowerCase()) ||
+            (o.customerName.trim().toLowerCase() === customerName.trim().toLowerCase() && o.address.trim().toLowerCase() === address.trim().toLowerCase()))
+      );
+    } catch {
+      return false;
+    }
+  }, [customerName, phone, address, initial]);
 
   // Suggestions derived from stored customers
   const suggestionQuery = phone.trim() ? phone.trim() : customerName.trim();
@@ -119,36 +139,42 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
     e.preventDefault();
     if (!customerName.trim() || !address.trim()) return;
 
-    const { parsedLat, parsedLng } = parseCoordinates();
-    const now = new Date().toISOString();
-    const order: DeliveryOrder = {
-      id: initial?.id ?? Date.now().toString(),
-      customerName: customerName.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-      note: note.trim(),
-      status,
-      priority,
-      lat: parsedLat ?? initial?.lat,
-      lng: parsedLng ?? initial?.lng,
-      geocodedAddress: initial?.geocodedAddress,
-      placeId: initial?.placeId,
-      geocodingStatus: initial?.geocodingStatus,
-      geocodingError: initial?.geocodingError,
-      createdAt: initial?.createdAt ?? now,
-      updatedAt: now,
-    };
+    try {
+      const { parsedLat, parsedLng } = parseCoordinates();
+      const now = new Date().toISOString();
+      const order: DeliveryOrder = {
+        id: initial?.id ?? Date.now().toString(),
+        customerName: customerName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        note: note.trim(),
+        status,
+        priority,
+        lat: parsedLat ?? initial?.lat,
+        lng: parsedLng ?? initial?.lng,
+        geocodedAddress: initial?.geocodedAddress,
+        placeId: initial?.placeId,
+        geocodingStatus: initial?.geocodingStatus,
+        geocodingError: initial?.geocodingError,
+        createdAt: initial?.createdAt ?? now,
+        updatedAt: now,
+        deliveryWindow: deliveryWindow.trim() || undefined,
+      };
 
-    // If creating new order and saveCustomer enabled, upsert into customers
-    if (!isEdit && saveCustomer) {
-      try {
-        upsertFrequentCustomerFromOrder(order);
-      } catch (err) {
-        console.error("Error upserting customer from order", err);
+      // If creating new order and saveCustomer enabled, upsert into customers
+      if (!isEdit && saveCustomer) {
+        try {
+          upsertFrequentCustomerFromOrder(order);
+        } catch (err) {
+          console.error("Error upserting customer from order", err);
+        }
       }
-    }
 
-    onSave(order);
+      onSave(order);
+    } catch (err) {
+      console.error("Error saving order:", err);
+      alert("Lưu đơn hàng thất bại!");
+    }
   };
 
   // ── Shared input styles ───────────────────────────────────────────
@@ -196,6 +222,16 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
 
         {/* ── Body (scrollable) ── */}
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+          {/* Duplicate warning */}
+          {isDuplicate && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3.5 text-xs font-bold flex items-start gap-2 shadow-sm animate-pulse">
+              <span className="shrink-0 text-sm">⚠️</span>
+              <span>
+                Phát hiện khả năng trùng đơn: Khách hàng hoặc số điện thoại này đã có một đơn giao khác tại cùng địa chỉ này.
+              </span>
+            </div>
+          )}
+
           {/* Customer name */}
           <div className="relative">
             <label className={labelClass}>
@@ -237,6 +273,18 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
               onChange={(e) => setAddress(e.target.value)}
               placeholder="VD: 12 Nguyễn Huệ, Quận 1, TP.HCM"
               required
+            />
+          </div>
+
+          {/* Delivery Window */}
+          <div>
+            <label className={labelClass}>Khung giờ giao (tùy chọn)</label>
+            <input
+              type="text"
+              className={inputClass}
+              value={deliveryWindow}
+              onChange={(e) => setDeliveryWindow(e.target.value)}
+              placeholder="VD: Sáng 8h-12h, Chiều sau 14h"
             />
           </div>
 

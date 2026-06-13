@@ -84,7 +84,7 @@ export default function HomePage() {
                 Tuyến hôm nay
               </h2>
               {activeRoute ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   <SummaryCard title="Tổng đơn" value={stats.total} />
                   <SummaryCard title="Đã giao" value={stats.delivered} />
                   <SummaryCard title="Chưa giao" value={stats.pending} />

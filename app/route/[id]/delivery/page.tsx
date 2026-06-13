@@ -187,7 +187,7 @@ export default function DeliveryPage({ params }: { params: Promise<{ id: string 
         </div>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 max-w-md mx-auto z-20 flex flex-col gap-3 pb-safe-offset-4 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.1)]">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 max-w-md md:max-w-2xl mx-auto z-20 flex flex-col gap-3 pb-safe-offset-4 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.1)] md:left-64">
         <div className="flex gap-3">
           <button 
             className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 active:bg-slate-300 py-4 rounded-2xl font-bold text-lg transition-colors border border-slate-200"
@@ -207,6 +207,7 @@ export default function DeliveryPage({ params }: { params: Promise<{ id: string 
             className={`p-3 font-bold flex items-center gap-1 rounded-xl transition-colors ${currentIndex > 0 ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-300'}`}
             onClick={() => navigateStop(-1)}
             disabled={currentIndex === 0}
+            aria-label="Đơn giao trước đó"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -217,6 +218,7 @@ export default function DeliveryPage({ params }: { params: Promise<{ id: string 
             className={`p-3 font-bold flex items-center gap-1 rounded-xl transition-colors ${currentIndex < route.stops.length - 1 ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-300'}`}
             onClick={() => navigateStop(1)}
             disabled={currentIndex === route.stops.length - 1}
+            aria-label="Đơn giao tiếp theo"
           >
             Đơn tiếp
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -93,6 +93,33 @@ export const isOnline = (): boolean => {
   return navigator.onLine;
 };
 
+// ── Coordinate Validation Helpers ────────────────────────────────────
+
+/**
+ * Validate latitude is a number between -90 and 90.
+ */
+export const validateLatitude = (lat: unknown): boolean => {
+  if (lat === null || lat === undefined || lat === "") return false;
+  const num = typeof lat === "number" ? lat : parseFloat(String(lat));
+  return !isNaN(num) && num >= -90 && num <= 90;
+};
+
+/**
+ * Validate longitude is a number between -180 and 180.
+ */
+export const validateLongitude = (lng: unknown): boolean => {
+  if (lng === null || lng === undefined || lng === "") return false;
+  const num = typeof lng === "number" ? lng : parseFloat(String(lng));
+  return !isNaN(num) && num >= -180 && num <= 180;
+};
+
+/**
+ * Validate coordinate pair is within acceptable GPS boundaries.
+ */
+export const validateCoordinates = (lat: unknown, lng: unknown): boolean => {
+  return validateLatitude(lat) && validateLongitude(lng);
+};
+
 // ── Default map center (Ho Chi Minh City) ───────────────────────────
 
 export const DEFAULT_CENTER = { lat: 10.7769, lng: 106.7009 };
@@ -117,9 +144,21 @@ const SCRIPT_ID = "google-maps-script";
  */
 export const loadGoogleMapsScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
+    // SSR safety
+    if (typeof window === "undefined") {
+      resolve();
+      return;
+    }
+
     // Already loaded
     if (typeof google !== "undefined" && google.maps) {
       resolve();
+      return;
+    }
+
+    // Check offline state early
+    if (!isOnline()) {
+      reject(new Error("OFFLINE: Không có kết nối mạng để tải bản đồ"));
       return;
     }
 
@@ -128,26 +167,26 @@ export const loadGoogleMapsScript = (): Promise<void> => {
     if (existing) {
       existing.addEventListener("load", () => resolve());
       existing.addEventListener("error", () =>
-        reject(new Error("Google Maps script load failed"))
+        reject(new Error("GOOGLE_MAPS_SCRIPT_LOAD_FAILED: Lỗi tải script Google Maps"))
       );
       return;
     }
 
     const key = getGoogleMapsApiKey();
     if (!key) {
-      reject(new Error("Missing API key"));
+      reject(new Error("MISSING_API_KEY: Chưa cấu hình Google Maps API key"));
       return;
     }
 
     const script = document.createElement("script");
     script.id = SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=marker&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=marker,geometry&v=weekly`;
     script.async = true;
     script.defer = true;
 
     // Timeout after 15 seconds
     const timeout = setTimeout(() => {
-      reject(new Error("Google Maps script load timed out"));
+      reject(new Error("GOOGLE_MAPS_SCRIPT_LOAD_TIMED_OUT: Hết thời gian chờ tải bản đồ (15 giây)"));
     }, 15000);
 
     script.addEventListener("load", () => {
@@ -157,7 +196,7 @@ export const loadGoogleMapsScript = (): Promise<void> => {
 
     script.addEventListener("error", () => {
       clearTimeout(timeout);
-      reject(new Error("Google Maps script load failed"));
+      reject(new Error("GOOGLE_MAPS_SCRIPT_LOAD_FAILED: Không thể tải được script bản đồ. Vui lòng kiểm tra lại mạng hoặc API Key."));
     });
 
     document.head.appendChild(script);

@@ -15,6 +15,18 @@ const STATUS_CFG: Record<
     text: "text-amber-700",
     dot: "bg-amber-400",
   },
+  ready: {
+    label: "Sẵn sàng",
+    bg: "bg-indigo-50",
+    text: "text-indigo-700",
+    dot: "bg-indigo-400",
+  },
+  assigned: {
+    label: "Đã xếp tuyến",
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    dot: "bg-violet-400",
+  },
   delivering: {
     label: "Đang giao",
     bg: "bg-cyan-50",
@@ -54,6 +66,8 @@ const PRIORITY_CFG: Record<
 
 const STATUS_CYCLE: DeliveryStatus[] = [
   "pending",
+  "ready",
+  "assigned",
   "delivering",
   "delivered",
   "failed",
@@ -113,6 +127,11 @@ export const DeliveryOrderCard = ({
                 />
               </svg>
               {order.phone}
+            </p>
+          )}
+          {order.deliveryWindow && (
+            <p className="text-xs text-indigo-600 font-bold mt-1.5 flex items-center gap-1">
+              <span>🕒</span> Khung giờ: {order.deliveryWindow}
             </p>
           )}
         </div>

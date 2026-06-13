@@ -26,6 +26,8 @@ export interface RoutePlan {
 
 export type DeliveryStatus =
   | "pending"
+  | "ready"
+  | "assigned"
   | "delivering"
   | "delivered"
   | "failed"
@@ -55,6 +57,7 @@ export interface DeliveryOrder {
   geocodingError?: string;
   createdAt: string;
   updatedAt: string;
+  deliveryWindow?: string;
 }
 
 // ── Route Planner (Prompt 3) ────────────────────────────────────────
@@ -86,6 +89,7 @@ export interface DeliveryRoutePlan {
   points: RoutePoint[];
   createdAt: string;
   updatedAt: string;
+  routingMode?: "google" | "local-fallback" | "manual";
 }
 
 // ── Route History (Prompt 14) ───────────────────────────────────────
@@ -123,7 +127,7 @@ export interface RouteHistoryItem {
   totalDurationSeconds?: number;
   distanceText?: string;
   durationText?: string;
-  optimizedBy?: "local" | "distance_matrix" | "manual";
+  optimizedBy?: "google" | "local-fallback" | "manual" | "local" | "distance_matrix";
   note?: string;
   createdAt: string;
   updatedAt: string;

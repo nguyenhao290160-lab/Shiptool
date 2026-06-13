@@ -18,6 +18,9 @@ import { SystemStatusCard } from "./SystemStatusCard";
 import { LocalDataStatusCard } from "./LocalDataStatusCard";
 import { SystemHealthCheck } from "./SystemHealthCheck";
 import { SettingsShortcutGrid } from "./SettingsShortcutGrid";
+import { loadGoogleMapsScript } from "@/lib/mapUtils";
+import { geocodeAddress } from "@/lib/geocoding";
+import { mapGoogleMapsError } from "@/lib/googleMapsErrors";
 
 export function SettingsApiCenter() {
   const [isMounted, setIsMounted] = useState(false);
@@ -33,15 +36,102 @@ export function SettingsApiCenter() {
   const [storageAvailable, setStorageAvailable] = useState(false);
   const isOnline = useOnlineStatus();
 
+  // Diagnostics States
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagResult, setDiagResult] = useState<{
+    apiKeyStatus: "ok" | "missing";
+    internetStatus: "online" | "offline";
+    scriptStatus: "success" | "failed" | "not_tested";
+    geocodeStatus: "success" | "failed" | "not_tested";
+    detailedError: { title: string; message: string; fix: string } | null;
+  } | null>(null);
+
+  const refreshStats = () => {
+    setOrdersCount(getDeliveryOrdersCount());
+    setRoutesCount(getRoutePlansCount());
+    setStorageSize(getLocalStorageSize());
+    setStorageKeys(getShipRouteStorageKeys());
+  };
+
+  const runDiagnostics = async () => {
+    setDiagLoading(true);
+    setDiagResult(null);
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const isKeySet = isApiKeyConfigured(apiKey);
+    const online = navigator.onLine;
+
+    const result: {
+      apiKeyStatus: "ok" | "missing";
+      internetStatus: "online" | "offline";
+      scriptStatus: "success" | "failed" | "not_tested";
+      geocodeStatus: "success" | "failed" | "not_tested";
+      detailedError: { title: string; message: string; fix: string } | null;
+    } = {
+      apiKeyStatus: isKeySet ? "ok" : "missing",
+      internetStatus: online ? "online" : "offline",
+      scriptStatus: "not_tested",
+      geocodeStatus: "not_tested",
+      detailedError: null,
+    };
+
+    if (!isKeySet) {
+      result.detailedError = {
+        title: "Chưa cấu hình API Key",
+        message: "Ứng dụng chưa phát hiện khóa API Google Maps nào được cấu hình trong hệ thống.",
+        fix: "Hãy tạo file .env.local ở thư mục gốc của dự án, thiết lập biến NEXT_PUBLIC_GOOGLE_MAPS_API_KEY và khởi động lại npm run dev."
+      };
+      setDiagResult(result);
+      setDiagLoading(false);
+      return;
+    }
+
+    if (!online) {
+      result.detailedError = {
+        title: "Thiết bị ngoại tuyến",
+        message: "Bạn không có kết nối internet để kiểm tra các dịch vụ của Google.",
+        fix: "Vui lòng kết nối wifi hoặc dữ liệu di động và bấm thử lại."
+      };
+      setDiagResult(result);
+      setDiagLoading(false);
+      return;
+    }
+
+    // 1. Test script load
+    try {
+      await loadGoogleMapsScript();
+      result.scriptStatus = "success";
+    } catch (err) {
+      result.scriptStatus = "failed";
+      result.detailedError = mapGoogleMapsError(err);
+      setDiagResult(result);
+      setDiagLoading(false);
+      return;
+    }
+
+    // 2. Test Geocoding API call
+    try {
+      const res = await geocodeAddress("Hồ Chí Minh", apiKey!);
+      if (res && res.lat) {
+        result.geocodeStatus = "success";
+      } else {
+        throw new Error("Không lấy được tọa độ thực tế");
+      }
+    } catch (err) {
+      result.geocodeStatus = "failed";
+      result.detailedError = mapGoogleMapsError(err);
+    }
+
+    setDiagResult(result);
+    setDiagLoading(false);
+  };
+
   useEffect(() => {
     const timer = setTimeout(async () => {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
       setIsApiKeySet(isApiKeyConfigured(apiKey));
       setApiKeyMasked(maskApiKey(apiKey));
-      setOrdersCount(getDeliveryOrdersCount());
-      setRoutesCount(getRoutePlansCount());
-      setStorageSize(getLocalStorageSize());
-      setStorageKeys(getShipRouteStorageKeys());
+      refreshStats();
       setSwSupported(isServiceWorkerSupported());
       setHasBackup(hasBackupData());
       setStorageAvailable(isLocalStorageAvailable());
@@ -136,33 +226,119 @@ export function SettingsApiCenter() {
                   <strong>Bước 4:</strong> Restart dev server bằng <code className="bg-white/80 px-2 py-0.5 rounded-md font-mono text-xs border border-sky-200/50">npm run dev</code>.
                 </p>
                 <p className="text-xs text-sky-700 mt-2 bg-white/60 rounded-lg px-3 py-2 border border-sky-200/50">
-                  💡 <strong>Lưu ý:</strong> Không commit file <code className="font-mono">.env.local</code> lên GitHub!
+                  💡 <strong>Lưu ý:</strong> Không commit file <code className="font-mono">.env.local</code> lên GitHub! Khi deploy lên môi trường Production (như Vercel, Netlify), bạn cần thiết lập biến môi trường <code className="font-mono">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> trực tiếp trong phần cấu hình biến môi trường (Environment Variables) của dịch vụ hosting đó.
                 </p>
               </div>
             </div>
 
-            {/* API Checklist */}
-            <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80">
-              <h3 className="font-bold text-sm text-slate-900 mb-3 flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-sm">✓</span>
-                APIs cần bật trong Google Cloud
+            {/* Google Maps Configuration Diagnostics (Added for Prompt 39) */}
+            <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80 space-y-3">
+              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center text-sm">🔍</span>
+                Chẩn đoán Google Maps
               </h3>
-              <div className="space-y-2.5 text-sm">
-                {[
-                  { icon: "🗺️", name: "Maps JavaScript API" },
-                  { icon: "📍", name: "Geocoding API" },
-                  { icon: "🛣️", name: "Directions API" },
-                  { icon: "📊", name: "Distance Matrix API" },
-                ].map((api) => (
-                  <div key={api.name} className="flex items-center gap-3 bg-white/60 rounded-lg px-3 py-2 border border-slate-200/50">
-                    <span className="text-base">{api.icon}</span>
-                    <span className="text-slate-700 font-medium">{api.name}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-3 bg-white/60 rounded-lg px-3 py-2 border border-slate-200/50">
-                💡 App không thể tự biết API nào đã bật nếu chưa gọi thử. Hãy kiểm tra trong Google Cloud Console.
+              
+              <p className="text-xs text-slate-600 font-medium">
+                Chạy kiểm thử kết nối và quyền hạn API key để đảm bảo các dịch vụ bản đồ hoạt động đúng.
               </p>
+
+              <button
+                onClick={runDiagnostics}
+                disabled={diagLoading}
+                className="w-full bg-violet-600 hover:bg-violet-700 active:bg-violet-800 disabled:bg-slate-400 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                {diagLoading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Đang chạy kiểm tra...
+                  </>
+                ) : (
+                  <>
+                    <span>Kiểm tra cấu hình Google Maps</span>
+                  </>
+                )}
+              </button>
+
+              {/* Diagnostic Results */}
+              {diagResult && (
+                <div className="space-y-3 pt-2">
+                  <div className="space-y-2 border-t border-slate-200/60 pt-2.5">
+                    {/* API Key Check */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-medium">1. Khóa API Key:</span>
+                      <span className={`font-bold ${diagResult.apiKeyStatus === "ok" ? "text-emerald-600" : "text-amber-600"}`}>
+                        {diagResult.apiKeyStatus === "ok" ? "✓ Đã tìm thấy" : "✗ Chưa có"}
+                      </span>
+                    </div>
+
+                    {/* Internet Check */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-medium">2. Kết nối Internet:</span>
+                      <span className={`font-bold ${diagResult.internetStatus === "online" ? "text-emerald-600" : "text-red-600"}`}>
+                        {diagResult.internetStatus === "online" ? "✓ Kết nối tốt" : "✗ Ngoại tuyến"}
+                      </span>
+                    </div>
+
+                    {/* Script Load Check */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-medium">3. Tải Maps Script:</span>
+                      <span className={`font-bold ${
+                        diagResult.scriptStatus === "success" 
+                          ? "text-emerald-600" 
+                          : diagResult.scriptStatus === "failed" 
+                          ? "text-red-600" 
+                          : "text-slate-400"
+                      }`}>
+                        {diagResult.scriptStatus === "success" && "✓ Thành công"}
+                        {diagResult.scriptStatus === "failed" && "✗ Thất bại"}
+                        {diagResult.scriptStatus === "not_tested" && "— Chưa thử"}
+                      </span>
+                    </div>
+
+                    {/* Geocoding API Check */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-medium">4. Google Geocoding API:</span>
+                      <span className={`font-bold ${
+                        diagResult.geocodeStatus === "success" 
+                          ? "text-emerald-600" 
+                          : diagResult.geocodeStatus === "failed" 
+                          ? "text-red-600" 
+                          : "text-slate-400"
+                      }`}>
+                        {diagResult.geocodeStatus === "success" && "✓ Hoạt động tốt"}
+                        {diagResult.geocodeStatus === "failed" && "✗ Gặp lỗi"}
+                        {diagResult.geocodeStatus === "not_tested" && "— Chưa thử"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Detailed Error Box */}
+                  {diagResult.detailedError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5 text-xs">
+                      <p className="font-bold text-red-800 flex items-center gap-1.5">
+                        <span className="text-sm">⚠️</span>
+                        {diagResult.detailedError.title}
+                      </p>
+                      <p className="text-red-700 leading-relaxed font-medium">
+                        {diagResult.detailedError.message}
+                      </p>
+                      <div className="border-t border-red-200/50 my-1 pt-1.5">
+                        <p className="font-bold text-slate-700 uppercase text-[9px] tracking-wider">Cách khắc phục đề xuất:</p>
+                        <p className="text-slate-600 font-medium leading-relaxed mt-0.5">
+                          {diagResult.detailedError.fix}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!diagResult.detailedError && diagResult.geocodeStatus === "success" && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 font-semibold flex items-center gap-1.5">
+                      <span>🎉</span>
+                      <span>Cấu hình Google Maps hoàn toàn chính xác và sẵn sàng sử dụng!</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -208,13 +384,14 @@ export function SettingsApiCenter() {
           <div className="card-premium space-y-4">
             <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2.5">
               <span className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center text-lg">💾</span>
-              Dữ liệu cục bộ
+              Dữ liệu & sao lưu
             </h2>
             <LocalDataStatusCard
               ordersCount={ordersCount}
               routesCount={routesCount}
               storageSize={storageSize}
               storageKeys={storageKeys}
+              onRefresh={refreshStats}
             />
           </div>
 

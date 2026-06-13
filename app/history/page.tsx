@@ -71,7 +71,7 @@ export default function HistoryPage() {
             const total = route.points.length;
             const delivered = route.deliveredOrders;
             return (
-              <div key={route.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-3 transition-transform active:scale-95">
+              <div key={route.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-3 hover:shadow-md transition-all">
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-bold text-lg text-slate-900 leading-tight mb-1">{route.name}</h3>

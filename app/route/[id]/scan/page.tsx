@@ -415,10 +415,12 @@ export default function ScanPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       {activeResults.filter(r => r.status === 'done').length > 1 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 z-40 pb-safe-offset-4">
-          <BigActionButton onClick={saveAllValid}>
-            Lưu tất cả đơn hợp lệ ({activeResults.filter(r => r.status === 'done' && r.parsedData.address?.trim()).length})
-          </BigActionButton>
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 z-40 pb-safe-offset-4 md:left-64">
+          <div className="max-w-2xl mx-auto w-full">
+            <BigActionButton onClick={saveAllValid}>
+              Lưu tất cả đơn hợp lệ ({activeResults.filter(r => r.status === 'done' && r.parsedData.address?.trim()).length})
+            </BigActionButton>
+          </div>
         </div>
       )}
     </MobilePageShell>

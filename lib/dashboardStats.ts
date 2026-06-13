@@ -152,6 +152,8 @@ export const truncateAddress = (address: string, maxLength: number = 35): string
 export const getStatusLabel = (status: DeliveryStatus): string => {
   const labels: Record<DeliveryStatus, string> = {
     pending: "Chờ giao",
+    ready: "Sẵn sàng",
+    assigned: "Đã xếp",
     delivering: "Đang giao",
     delivered: "Đã giao",
     failed: "Thất bại",
@@ -162,12 +164,14 @@ export const getStatusLabel = (status: DeliveryStatus): string => {
 
 export const getStatusColor = (
   status: DeliveryStatus
-): "text-amber-600" | "text-cyan-600" | "text-green-600" | "text-red-600" | "text-slate-500" => {
+): "text-amber-600" | "text-cyan-600" | "text-green-600" | "text-red-600" | "text-slate-500" | "text-indigo-600" | "text-violet-600" => {
   const colors: Record<
     DeliveryStatus,
-    "text-amber-600" | "text-cyan-600" | "text-green-600" | "text-red-600" | "text-slate-500"
+    "text-amber-600" | "text-cyan-600" | "text-green-600" | "text-red-600" | "text-slate-500" | "text-indigo-600" | "text-violet-600"
   > = {
     pending: "text-amber-600",
+    ready: "text-indigo-600",
+    assigned: "text-violet-600",
     delivering: "text-cyan-600",
     delivered: "text-green-600",
     failed: "text-red-600",
@@ -178,12 +182,14 @@ export const getStatusColor = (
 
 export const getStatusBgColor = (
   status: DeliveryStatus
-): "bg-amber-50" | "bg-cyan-50" | "bg-green-50" | "bg-red-50" | "bg-slate-50" => {
+): "bg-amber-50" | "bg-cyan-50" | "bg-green-50" | "bg-red-50" | "bg-slate-50" | "bg-indigo-50" | "bg-violet-50" => {
   const colors: Record<
     DeliveryStatus,
-    "bg-amber-50" | "bg-cyan-50" | "bg-green-50" | "bg-red-50" | "bg-slate-50"
+    "bg-amber-50" | "bg-cyan-50" | "bg-green-50" | "bg-red-50" | "bg-slate-50" | "bg-indigo-50" | "bg-violet-50"
   > = {
     pending: "bg-amber-50",
+    ready: "bg-indigo-50",
+    assigned: "bg-violet-50",
     delivering: "bg-cyan-50",
     delivered: "bg-green-50",
     failed: "bg-red-50",

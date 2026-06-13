@@ -7,6 +7,8 @@ import { RoutePoint, DeliveryStatus, DeliveryPriority } from "@/lib/types";
 
 const STATUS_LABEL: Record<DeliveryStatus, string> = {
   pending: "Chờ giao",
+  ready: "Sẵn sàng",
+  assigned: "Đã xếp",
   delivering: "Đang giao",
   delivered: "Đã giao",
   failed: "Thất bại",
@@ -15,6 +17,8 @@ const STATUS_LABEL: Record<DeliveryStatus, string> = {
 
 const STATUS_DOT: Record<DeliveryStatus, string> = {
   pending: "bg-amber-400",
+  ready: "bg-indigo-400",
+  assigned: "bg-violet-400",
   delivering: "bg-cyan-400",
   delivered: "bg-emerald-400",
   failed: "bg-red-400",

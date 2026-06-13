@@ -82,6 +82,7 @@ function formatMinutes(min?: number) {
 }
 
 export default function ReportsPage() {
+  const [isMounted, setIsMounted] = useState(false);
   const [orders] = useState<DeliveryOrder[]>(() => {
     if (typeof window === "undefined") return [];
     return safeParse<DeliveryOrder[]>(localStorage.getItem(LS_KEYS.orders)) ?? [];
@@ -109,6 +110,7 @@ export default function ReportsPage() {
   React.useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const t = setTimeout(() => {
+      setIsMounted(true);
       setCustomFrom((prev) => prev || today);
       setCustomTo((prev) => prev || today);
     }, 0);
@@ -274,6 +276,18 @@ export default function ReportsPage() {
 
   function onPrint() {
     window.print();
+  }
+
+  if (!isMounted) {
+    return (
+      <div className="page-container">
+        <main className="flex-1 p-4 md:p-6 flex flex-col gap-5 pb-24">
+          <div className="text-center py-12 text-slate-500 font-semibold bg-white rounded-2xl border border-slate-200">
+            Đang tải báo cáo hiệu suất...
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (

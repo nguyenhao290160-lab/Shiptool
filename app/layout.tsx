@@ -42,8 +42,8 @@ export default function RootLayout({
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <RootClientWrapper>{children}
-            <AiHelpWidget />
-          </RootClientWrapper>
+          <AiHelpWidget />
+        </RootClientWrapper>
       </body>
     </html>
   );

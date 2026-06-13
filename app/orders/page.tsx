@@ -23,6 +23,8 @@ type FilterKey = "all" | DeliveryStatus;
 const FILTER_TABS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Tất cả" },
   { key: "pending", label: "Chờ giao" },
+  { key: "ready", label: "Sẵn sàng" },
+  { key: "assigned", label: "Đã xếp tuyến" },
   { key: "delivering", label: "Đang giao" },
   { key: "delivered", label: "Đã giao" },
   { key: "failed", label: "Thất bại" },
@@ -36,6 +38,8 @@ export default function OrdersPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [coordFilter, setCoordFilter] = useState<"all" | "has_coords" | "missing_coords">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "priority" | "status">("newest");
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState<DeliveryOrder | undefined>(
     undefined
@@ -276,24 +280,58 @@ export default function OrdersPage() {
 
   // ── Filtered + searched list ──────────────────────────────────────
 
-  const filteredOrders = orders
-    .filter((o) => (filter === "all" ? true : o.status === filter))
-    .filter((o) => {
-      if (!searchQuery.trim()) return true;
+  const filteredOrders = React.useMemo(() => {
+    let result = [...orders];
+
+    // Status filter
+    if (filter !== "all") {
+      result = result.filter((o) => o.status === filter);
+    }
+
+    // Coordinates filter
+    if (coordFilter === "has_coords") {
+      result = result.filter((o) => o.lat !== undefined && o.lng !== undefined);
+    } else if (coordFilter === "missing_coords") {
+      result = result.filter((o) => o.lat === undefined || o.lng === undefined);
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return (
-        o.customerName.toLowerCase().includes(q) ||
-        o.address.toLowerCase().includes(q) ||
-        o.phone.includes(q)
+      result = result.filter(
+        (o) =>
+          o.customerName.toLowerCase().includes(q) ||
+          o.address.toLowerCase().includes(q) ||
+          o.phone.includes(q) ||
+          (o.note && o.note.toLowerCase().includes(q))
       );
-    })
-    // Sort: high priority first, then by createdAt desc
-    .sort((a, b) => {
-      const prioOrder = { high: 0, normal: 1, low: 2 };
-      const prioDiff = prioOrder[a.priority] - prioOrder[b.priority];
-      if (prioDiff !== 0) return prioDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortBy === "newest") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortBy === "oldest") {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (sortBy === "priority") {
+        const prioOrder = { high: 0, normal: 1, low: 2 };
+        const diff = prioOrder[a.priority] - prioOrder[b.priority];
+        if (diff !== 0) return diff;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortBy === "status") {
+        const statusOrder = { pending: 0, ready: 1, assigned: 2, delivering: 3, delivered: 4, failed: 5, cancelled: 6 };
+        const diff = statusOrder[a.status] - statusOrder[b.status];
+        if (diff !== 0) return diff;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      return 0;
     });
+
+    return result;
+  }, [orders, filter, coordFilter, searchQuery, sortBy]);
 
   // ── SSR placeholder ───────────────────────────────────────────────
 
@@ -344,7 +382,7 @@ export default function OrdersPage() {
           </div>
            <button
              onClick={handleAddNew}
-             className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white px-4 h-10 rounded-xl font-bold text-sm transition-colors shadow-sm shadow-cyan-600/20 flex items-center gap-1.5"
+             className="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-sm shadow-cyan-600/20 flex items-center gap-1.5"
            >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -406,6 +444,35 @@ export default function OrdersPage() {
               {tab.label}
             </button>
           ))}
+        </div>
+
+        {/* ── Advanced Coordinate & Sorting Selectors ── */}
+        <div className="px-5 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-slate-100 pt-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Tọa độ:</span>
+            <select
+              value={coordFilter}
+              onChange={(e) => setCoordFilter(e.target.value as "all" | "has_coords" | "missing_coords")}
+              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-cyan-500/30 outline-none font-bold text-slate-700"
+            >
+              <option value="all">Tất cả đơn giao</option>
+              <option value="has_coords">Đơn đã có tọa độ GPS</option>
+              <option value="missing_coords">Đơn thiếu tọa độ GPS</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Sắp xếp:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "priority" | "status")}
+              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-cyan-500/30 outline-none font-bold text-slate-700"
+            >
+              <option value="newest">Mới nhất trước</option>
+              <option value="oldest">Cũ nhất trước</option>
+              <option value="priority">Theo mức ưu tiên (Cao → Thấp)</option>
+              <option value="status">Theo trạng thái xử lý</option>
+            </select>
+          </div>
         </div>
       </header>
 
@@ -522,17 +589,121 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {filteredOrders.map((order) => (
-              <DeliveryOrderCard
-                key={order.id}
-                order={order}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onStatusChange={handleStatusChange}
-                onGeocode={handleGeocodeOrder}
-                geocodingLoading={geocodingLoading}
-              />
-            ))}
+            {/* Mobile View: list of cards */}
+            <div className="flex flex-col gap-3 md:hidden">
+              {filteredOrders.map((order) => (
+                <DeliveryOrderCard
+                  key={order.id}
+                  order={order}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onStatusChange={handleStatusChange}
+                  onGeocode={handleGeocodeOrder}
+                  geocodingLoading={geocodingLoading}
+                />
+              ))}
+            </div>
+
+            {/* Desktop View: polished table layout */}
+            <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-200">
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Khách hàng / SĐT</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Địa chỉ</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Khung giờ</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ghi chú</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tọa độ GPS</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ưu tiên</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredOrders.map((order) => {
+                    const isGeocoding = geocodingLoading.has(order.id);
+                    return (
+                      <tr key={order.id} className="hover:bg-slate-50/40 transition-colors">
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-slate-900">{order.customerName}</div>
+                          <div className="text-xs text-slate-500 font-medium">{order.phone || "—"}</div>
+                        </td>
+                        <td className="px-5 py-4 max-w-[200px] truncate text-sm text-slate-700 font-medium" title={order.address}>
+                          {order.address}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap text-xs text-indigo-600 font-bold">
+                          {order.deliveryWindow || "—"}
+                        </td>
+                        <td className="px-5 py-4 max-w-[150px] truncate text-xs text-slate-500 font-medium" title={order.note}>
+                          {order.note || "—"}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          {order.lat && order.lng ? (
+                            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg">
+                              {order.lat.toFixed(4)}, {order.lng.toFixed(4)}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg">
+                              Chưa có
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                            order.priority === "high" ? "text-red-600 bg-red-50 border-red-200" :
+                            order.priority === "normal" ? "text-slate-600 bg-slate-50 border-slate-200" :
+                            "text-slate-400 bg-slate-50 border-slate-200"
+                          }`}>
+                            {order.priority === "high" ? "Cao" : order.priority === "normal" ? "Thường" : "Thấp"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${
+                            order.status === "pending" ? "bg-amber-50 text-amber-700" :
+                            order.status === "ready" ? "bg-indigo-50 text-indigo-700" :
+                            order.status === "assigned" ? "bg-violet-50 text-violet-700" :
+                            order.status === "delivering" ? "bg-cyan-50 text-cyan-700" :
+                            order.status === "delivered" ? "bg-emerald-50 text-emerald-700" :
+                            order.status === "failed" ? "bg-red-50 text-red-700" :
+                            "bg-slate-100 text-slate-500"
+                          }`}>
+                            {order.status === "pending" ? "Chờ giao" :
+                             order.status === "ready" ? "Sẵn sàng" :
+                             order.status === "assigned" ? "Đã xếp" :
+                             order.status === "delivering" ? "Đang giao" :
+                             order.status === "delivered" ? "Đã giao" :
+                             order.status === "failed" ? "Thất bại" : "Đã hủy"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap text-right text-xs font-bold space-x-1">
+                          {!order.lat && !order.lng && (
+                            <button
+                              onClick={() => handleGeocodeOrder(order.id)}
+                              disabled={isGeocoding}
+                              className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {isGeocoding ? "Đang lấy..." : "Lấy tọa độ"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEdit(order)}
+                            className="text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition-colors"
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => handleDelete(order.id)}
+                            className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>
