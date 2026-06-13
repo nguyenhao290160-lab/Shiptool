@@ -54,13 +54,21 @@ export function PerformanceDashboard() {
     [orders]
   );
 
-  const [needsBackup] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const lastBackupTime = localStorage.getItem("shiproute_last_backup_time");
-    if (!lastBackupTime) return true;
-    const backupTime = parseInt(lastBackupTime, 10);
-    return Date.now() - backupTime > 24 * 60 * 60 * 1000;
-  });
+  const [needsBackup, setNeedsBackup] = useState(false);
+
+  useEffect(() => {
+    try {
+      const lastBackupTime = localStorage.getItem("shiproute_last_backup_time");
+      if (!lastBackupTime) {
+        setNeedsBackup(true);
+      } else {
+        const backupTime = parseInt(lastBackupTime, 10);
+        setNeedsBackup(Date.now() - backupTime > 24 * 60 * 60 * 1000);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   if (!isMounted || !stats) {
     return (

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 
 export function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState<boolean | null>(() => {
-    if (typeof window === "undefined") return null;
-    return navigator.onLine;
-  });
+  // Always start as null for SSR consistency — real value set in useEffect
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // Set the initial value once mounted on the client
+    setIsOnline(navigator.onLine);
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 

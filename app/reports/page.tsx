@@ -100,10 +100,17 @@ export default function ReportsPage() {
   });
 
   const [range, setRange] = useState<string>("7");
-  const [customFrom, setCustomFrom] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [customTo, setCustomTo] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+
+  // Set date defaults after mount to avoid SSR/CSR mismatch
+  React.useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    setCustomFrom((prev) => prev || today);
+    setCustomTo((prev) => prev || today);
+  }, []);
 
   const { fromDate, toDate } = useMemo(() => {
     const today = new Date();
