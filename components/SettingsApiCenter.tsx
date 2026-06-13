@@ -163,6 +163,7 @@ export function SettingsApiCenter() {
             <li>🔒 Không commit file <code className="bg-white px-1 rounded font-mono text-xs">.env.local</code> lên GitHub</li>
             <li>🚫 Không dán API key trực tiếp vào code nguồn</li>
             <li>🌍 Giới hạn API key theo domain/IP trong Google Cloud nếu deploy sau này</li>
+            <li>🔐 Khuyến nghị: sử dụng HTTP referrers (ví dụ `http://localhost:3000/*` và domain Vercel) và bật API restrictions để chỉ cho phép Maps/Geocoding/Directions/Distance Matrix.</li>
           </ul>
         </div>
       </div>

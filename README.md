@@ -103,6 +103,30 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 - Không share API key thật công khai
 - App sẽ hoạt động bình thường offline và hiển thị fallback khi thiếu API key
 
+### Bảo mật Google Maps API key
+Để giảm nguy cơ lộ API key và tránh bị sử dụng trái phép, hãy cấu hình giới hạn (restrictions) cho API key trong Google Cloud Console:
+
+1. Vào Google Cloud Console → APIs & Services → Credentials → chọn API key sử dụng cho ShipRoute AI.
+2. Ở mục "Application restrictions" chọn **HTTP referrers (web sites)**.
+3. Thêm các referrer cho local/dev và Vercel, ví dụ:
+
+```
+http://localhost:3000/*
+http://localhost:3001/*
+https://ten-du-an.vercel.app/*
+```
+
+4. Ở mục "API restrictions" chỉ cho phép các API sau:
+
+- Maps JavaScript API
+- Geocoding API
+- Directions API
+- Distance Matrix API
+
+5. Lưu thay đổi và đợi vài phút để Google áp dụng.
+
+Lưu ý: Không để API key ở trạng thái "Unrestricted". Nếu gặp lỗi `RefererNotAllowedMapError`, kiểm tra lại danh sách referrers. Không đưa API key thật vào README hoặc mã nguồn.
+
 ## Build production
 
 ```bash

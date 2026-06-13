@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { RootClientWrapper } from "@/components/RootClientWrapper";
+import AiHelpWidget from "@/components/AiHelpWidget";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,7 +41,9 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body className={inter.className}>
-        <RootClientWrapper>{children}</RootClientWrapper>
+        <RootClientWrapper>{children}
+            <AiHelpWidget />
+          </RootClientWrapper>
       </body>
     </html>
   );
