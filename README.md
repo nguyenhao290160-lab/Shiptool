@@ -243,7 +243,27 @@ ShipRoute AI/
 └── RELEASE_NOTES.md               # Release notes (optional)
 ```
 
+## Triển khai (Deploy) & Vercel
+
+Ứng dụng có thể được deploy nhanh lên Vercel (hoặc hosting hỗ trợ Next.js). Hướng dẫn nhanh:
+
+1. Push mã nguồn sạch lên GitHub (branch `master` hoặc `main`).
+2. Đăng nhập vào https://vercel.com và chọn **Import Project** → **From Git** → chọn repository của bạn.
+3. Chọn framework: **Next.js** (Vercel tự nhận thường đúng).
+4. Trong mục **Environment Variables**, thêm:
+
+```text
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+> Lưu ý: Vì Maps JavaScript API chạy trên trình duyệt, biến môi trường này là public. Hãy **bật** các API cần thiết và **giới hạn** key bằng HTTP referrers (domain) trong Google Cloud Console.
+
+5. Deploy và kiểm tra trang sản phẩm. Kiểm tra các route chính và chức năng offline/local.
+
+6. Nếu muốn test trên domain riêng, cấu hình DNS trên Vercel và thêm domain vào Google Cloud API restrictions.
+
 ## Troubleshooting
+
 
 ### App không mở được / Hydration error
 
