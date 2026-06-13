@@ -11,7 +11,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: "dashboard",
     title: "Dashboard",
-    keywords: ["dashboard", "bảng", "thống kê"],
+    keywords: ["dashboard", "bảng", "thống kê", "tổng quan", "hiệu suất"],
     summary:
       "Trang Dashboard hiển thị thống kê đơn giao, trạng thái đơn và hiệu suất tổng quan.",
     steps: [
@@ -20,6 +20,42 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Dùng bộ lọc để xem theo khoảng thời gian hoặc trạng thái.",
     ],
     relatedModules: ["reports", "orders"],
+  },
+  // Thêm chủ đề còn thiếu
+  {
+    id: "user_guide",
+    title: "Hướng dẫn sử dụng",
+    keywords: ["hướng dẫn", "user guide", "bắt đầu", "cách dùng", "giới thiệu"],
+    summary: "Tổng quan các bước sử dụng app ShipRoute từ tạo đơn, lập tuyến, backup, xem báo cáo.",
+    steps: [
+      "Đăng nhập hoặc mở app.",
+      "Tạo đơn giao mới.",
+      "Lập tuyến đường giao hàng.",
+      "Theo dõi trạng thái và backup dữ liệu định kỳ.",
+    ],
+    relatedModules: ["dashboard", "orders", "route_planner", "backup"],
+  },
+  {
+    id: "privacy",
+    title: "Bảo mật & Quyền riêng tư",
+    keywords: ["bảo mật", "quyền riêng tư", "privacy", "dữ liệu cá nhân"],
+    summary: "App chỉ lưu dữ liệu trên trình duyệt của bạn, không gửi lên server. Có thể backup/restore thủ công.",
+    steps: [
+      "Dữ liệu đơn, tuyến, khách hàng chỉ lưu localStorage.",
+      "Có thể export/import dữ liệu qua JSON/CSV.",
+      "Không chia sẻ dữ liệu nếu không backup/export."],
+    relatedModules: ["backup", "settings"],
+  },
+  {
+    id: "accessibility",
+    title: "Trợ năng & Phản hồi",
+    keywords: ["trợ năng", "accessibility", "phản hồi", "a11y", "hỗ trợ"],
+    summary: "App hỗ trợ phím tắt, tab navigation, màu sắc tương phản và có thể dùng trên thiết bị di động.",
+    steps: [
+      "Dùng phím Tab để di chuyển giữa các trường.",
+      "Các nút có aria-label, hỗ trợ đọc màn hình.",
+      "Giao diện responsive cho mobile/tablet."],
+    relatedModules: ["settings"],
   },
   {
     id: "orders",
@@ -193,5 +229,64 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Sử dụng Export JSON trước khi làm thao tác can thiệp lớn.",
     ],
     relatedModules: ["settings", "backup"],
+  },
+  {
+    id: "import_backup",
+    title: "Import backup",
+    keywords: ["import", "khôi phục", "backup", "import json"],
+    summary: "Hướng dẫn import file backup JSON để khôi phục dữ liệu đã lưu trước đó.",
+    steps: [
+      "Mở Settings → Backup dữ liệu → Import JSON.",
+      "Chọn file .json đã export trước đó.",
+      "Xác nhận và chờ hệ thống xử lý, kiểm tra lại dữ liệu sau khi import.",
+    ],
+    relatedModules: ["backup"],
+  },
+  {
+    id: "reset_data",
+    title: "Reset / Xóa dữ liệu local",
+    keywords: ["reset", "xóa dữ liệu", "clear", "delete local"],
+    summary: "Hướng dẫn reset dữ liệu demo hoặc xóa toàn bộ dữ liệu local (cẩn trọng).",
+    steps: [
+      "Dùng chức năng Reset trong Settings nếu có (kiểm tra trước khi dùng).",
+      "Hoặc vào DevTools → Application → LocalStorage → xóa keys bắt đầu bằng shiproute_.",
+      "Luôn export JSON trước khi xóa nếu cần giữ lại dữ liệu.",
+    ],
+    relatedModules: ["settings", "backup"],
+  },
+  {
+    id: "vercel_deploy",
+    title: "Deploy lên Vercel",
+    keywords: ["vercel", "deploy", "push", "github"],
+    summary: "Hướng dẫn nhanh deploy project lên Vercel và cấu hình Environment Variable cho API key.",
+    steps: [
+      "Push mã nguồn sạch lên GitHub (không include .env.local).",
+      "Import repository vào Vercel → Chọn Next.js → Thêm biến NEXT_PUBLIC_GOOGLE_MAPS_API_KEY vào Environment Variables.",
+      "Deploy và kiểm tra trang. Nếu cần, cấu hình domain và API key restrictions.",
+    ],
+    relatedModules: ["README", "settings"],
+  },
+  {
+    id: "localstorage",
+    title: "localStorage & mất dữ liệu",
+    keywords: ["localstorage", "mất dữ liệu", "backup", "khôi phục"],
+    summary: "Giải thích về rủi ro khi dùng localStorage: dữ liệu chỉ trên trình duyệt hiện tại, nên backup định kỳ.",
+    steps: [
+      "Luôn export JSON trước khi chuyển máy hoặc xóa cache.",
+      "Sử dụng tính năng Backup để lưu bản sao ngoài trình duyệt.",
+    ],
+    relatedModules: ["backup", "settings"],
+  },
+  {
+    id: "ai_widget",
+    title: "Trợ lý ShipRoute AI (local)",
+    keywords: ["trợ lý", "ai", "help", "hướng dẫn"],
+    summary: "Trợ lý hiện là rule-based chạy local, trả lời các câu hỏi hướng dẫn sử dụng app, không gọi API AI bên ngoài.",
+    steps: [
+      "Mở nút Trợ lý góc phải dưới để xem các câu hỏi gợi ý.",
+      "Chọn câu hỏi gợi ý hoặc nhập câu hỏi vào ô và nhấn Gửi.",
+      "Sử dụng Xóa chat để reset lịch sử chat trợ lý.",
+    ],
+    relatedModules: ["settings", "README"],
   },
 ];

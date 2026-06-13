@@ -334,6 +334,30 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 - **Module có thể mở rộng**: Tất cả module đều kế thừa từ types.ts, có thể extend
 - **Google API**: Đã bọc fallback an toàn, không crash khi offline/thiếu key
 
+## AI Help Assistant
+
+ShipRoute AI có AI Help Widget local/rule-based. Có thể bật AI thật server-side bằng cách cấu hình biến môi trường phía server và bật flag sau:
+
+```env
+NEXT_PUBLIC_AI_HELP_ENABLED=true
+OPENAI_API_KEY=your_server_side_ai_key_here
+AI_HELP_MODEL=your_ai_model_here
+```
+
+Lưu ý:
+- Không đặt AI API key ở frontend (không dùng `NEXT_PUBLIC_` cho key).
+- Nếu server thiếu key hoặc offline, widget tự fallback về local/rule-based.
+
+## Quy trình thêm tính năng mới
+
+Để đảm bảo tính nhất quán khi mở rộng ShipRoute AI, xem các tài liệu trong thư mục `docs/` trước khi bắt đầu phát triển một tính năng mới. Các tài liệu chính:
+
+- `docs/FEATURE_DEVELOPMENT_WORKFLOW.md` — Quy trình chuẩn từng bước.
+- `docs/NEW_FEATURE_TEMPLATE.md` — Template mô tả tính năng (dùng để lập kế hoạch và PR).
+- `docs/NEW_FEATURE_PROMPT_TEMPLATE.md` — Prompt mẫu để dùng khi nhờ AI code editor tạo feature.
+
+Mỗi tính năng mới nên cập nhật `lib/appFeatureRegistry.ts` để AI Help Widget tự động biết về tính năng đó và có thể hướng dẫn người dùng.
+
 ## Lưu trữ dữ liệu & Backup
 
 ### Dữ liệu local
