@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  DeliveryOrder,
-  DeliveryStatus,
-  DeliveryPriority,
-} from "@/lib/types";
+import { FrequentCustomer, DeliveryOrder, DeliveryStatus, DeliveryPriority } from "@/lib/types";
+import { upsertFrequentCustomerFromOrder } from "@/lib/customerStorage";
+import { CustomerSuggestions } from "./CustomerSuggestions";
 
 // ── Option lists ────────────────────────────────────────────────────
 
@@ -51,6 +49,10 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
   const [lng, setLng] = useState<string>(initial?.lng?.toString() ?? "");
   const [latError, setLatError] = useState("");
   const [lngError, setLngError] = useState("");
+  const [saveCustomer, setSaveCustomer] = useState<boolean>(true);
+
+  // Suggestions derived from stored customers
+  const suggestionQuery = phone.trim() ? phone.trim() : customerName.trim();
 
   // Validate and parse latitude
   const handleLatChange = (value: string) => {
@@ -104,6 +106,15 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
     return { parsedLat, parsedLng };
   };
 
+  const handleSelectSuggestion = (c: FrequentCustomer) => {
+    setCustomerName(c.name);
+    setPhone(c.phone || "");
+    setAddress(c.address);
+    setNote(c.note || "");
+    if (c.lat !== undefined) setLat(String(c.lat));
+    if (c.lng !== undefined) setLng(String(c.lng));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim() || !address.trim()) return;
@@ -127,6 +138,16 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     };
+
+    // If creating new order and saveCustomer enabled, upsert into customers
+    if (!isEdit && saveCustomer) {
+      try {
+        upsertFrequentCustomerFromOrder(order);
+      } catch (err) {
+        console.error("Error upserting customer from order", err);
+      }
+    }
+
     onSave(order);
   };
 
@@ -176,7 +197,7 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
         {/* ── Body (scrollable) ── */}
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
           {/* Customer name */}
-          <div>
+          <div className="relative">
             <label className={labelClass}>
               Tên khách hàng <span className="text-red-500">*</span>
             </label>
@@ -189,6 +210,7 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
               required
               autoFocus
             />
+            <CustomerSuggestions query={suggestionQuery} onSelect={handleSelectSuggestion} visible={!!suggestionQuery} />
           </div>
 
           {/* Phone */}
@@ -229,6 +251,22 @@ export const DeliveryOrderForm = ({ initial, onSave, onCancel }: Props) => {
               placeholder="VD: Giao trước 10h, gọi trước khi đến"
             />
           </div>
+
+          {/* Save customer checkbox */}
+          {!isEdit && (
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="saveCustomer"
+                type="checkbox"
+                checked={saveCustomer}
+                onChange={(e) => setSaveCustomer(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <label htmlFor="saveCustomer" className="text-sm text-slate-700 font-medium">
+                Lưu khách này vào danh sách khách thường xuyên
+              </label>
+            </div>
+          )}
 
           {/* Status + Priority row */}
           <div className="grid grid-cols-2 gap-3">

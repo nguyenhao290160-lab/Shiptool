@@ -2,6 +2,7 @@
 
 import React from "react";
 import { DeliveryOrder } from "@/lib/types";
+import { SmartSuggestionsPanel } from "./SmartSuggestionsPanel";
 
 interface Props {
   orders: DeliveryOrder[];
@@ -32,21 +33,25 @@ export const DeliveryDashboard = ({ orders }: Props) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className={`rounded-xl border p-2.5 flex flex-col items-center justify-center text-center ${s.bg}`}
-        >
-          <span className={`w-2 h-2 rounded-full ${s.dot} mb-1`} />
-          <span className="text-2xl font-black text-slate-900 leading-none">
-            {s.value}
-          </span>
-          <span className="text-[10px] font-semibold text-slate-600 mt-1 leading-tight">
-            {s.label}
-          </span>
-        </div>
-      ))}
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className={`rounded-xl border p-2.5 flex flex-col items-center justify-center text-center ${s.bg}`}
+          >
+            <span className={`w-2 h-2 rounded-full ${s.dot} mb-1`} />
+            <span className="text-2xl font-black text-slate-900 leading-none">
+              {s.value}
+            </span>
+            <span className="text-[10px] font-semibold text-slate-600 mt-1 leading-tight">
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <SmartSuggestionsPanel maxItems={4} />
     </div>
   );
 };

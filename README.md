@@ -1,20 +1,59 @@
 # ShipRoute AI - Trợ lý sắp tuyến giao hàng
 
-Ứng dụng PWA (Progressive Web App) dành cho shipper giúp quản lý đơn giao, lập tuyến tối ưu và theo dõi giao hàng một cách hiệu quả.
+Ứng dụng **local-first** (ưu tiên cục bộ) dành cho shipper giúp quản lý đơn giao, lập tuyến tối ưu, xem bản đồ, theo dõi giao hàng, sao lưu dữ liệu và xem báo cáo hiệu suất.
+
+**Đặc điểm:**
+- 📱 **Local-first**: Tất cả dữ liệu lưu trên thiết bị, không cần backend
+- 🌐 **Offline-friendly**: Hoạt động khi mất kết nối mạng
+- 📦 **PWA**: Cài đặt như ứng dụng trên điện thoại
+- ⚡ **Nhanh & nhẹ**: Không phụ thuộc server, phản hồi nhanh
 
 ## Tính năng chính
 
-- **Quản lý đơn giao**: Thêm, chỉnh sửa, xóa và phân loại đơn giao
-- **Lập tuyến tối ưu**: Sử dụng Google Distance Matrix API để tối ưu tuyến đường
-- **Bản đồ tương tác**: Hiển thị marker đơn giao trên Google Maps
-- **Geocoding**: Chuyển đổi địa chỉ thành tọa độ GPS
+### Quản lý & Tối ưu
+- **Quản lý đơn giao**: Thêm, chỉnh sửa, xóa, tìm kiếm, lọc theo trạng thái/mức độ ưu tiên
+- **Dashboard**: Thống kê đơn giao, đơn sắp giao, đơn thất bại, tỷ lệ hoàn thành
+- **Lập tuyến local**: Sắp tuyến giao hàng từ danh sách đơn
+- **Tối ưu tuyến**: Dùng Google Distance Matrix hoặc rule-based local (fallback)
+- **Bản đồ Google Maps**: Xem marker các đơn giao
+- **Geocoding**: Chuyển đổi địa chỉ → tọa độ GPS
+- **Directions**: Vẽ tuyến đường chi tiết trên bản đồ
+
+### Dữ liệu & Lưu trữ
+- **Lịch sử tuyến**: Xem lại các tuyến đã giao, thống kê quãng đường, thời gian, số đơn
+- **Backup/Import**: Export toàn bộ dữ liệu JSON, CSV; import để khôi phục
+- **Khách hàng thường xuyên**: Lưu danh sách khách, tìm nhanh khi tạo đơn
+
+### Tài chính & Báo cáo
+- **Chi phí vận hành**: Tính toán giá xăng, chi phí bảo trì, lợi nhuận ước tính
+- **Báo cáo nâng cao**: Tổng hợp đơn, tuyến, khách, chi phí trong kỳ báo cáo
+- **Export báo cáo**: Xuất JSON, CSV, in báo cáo bằng `window.print()`
+- **Gợi ý thông minh**: Cảnh báo đơn ưu tiên cao, đơn thiếu tọa độ, vấn đề chi phí
+
+### Ngoại tuyến & PWA
 - **Chế độ Offline**: Tất cả dữ liệu được lưu cục bộ, app hoạt động khi mất mạng
 - **PWA**: Cài đặt như một ứng dụng trên thiết bị
+- **Service Worker**: Caching thông minh, tránh stale data từ Google API
+
+## Công nghệ sử dụng
+
+- **Next.js 16.2.9** - React framework, App Router
+- **React 19.2.4** - UI library
+- **TypeScript 5** - Type-safe JavaScript
+- **Tailwind CSS 4** - Styling utility-first
+- **localStorage** - Client-side data storage
+- **Google Maps JavaScript API** - Bản đồ
+- **Google Geocoding API** - Chuyển địa chỉ → tọa độ
+- **Google Directions API** - Vẽ tuyến đường
+- **Google Distance Matrix API** - Tối ưu tuyến theo khoảng cách
+- **PWA & Service Worker** - Offline support, installable
+- **ESLint 9** - Code quality
 
 ## Yêu cầu hệ thống
 
 - Node.js 18+
 - npm hoặc yarn
+- Trình duyệt: Chrome, Edge, Firefox, Safari (recommended: Chromium-based)
 
 ## Cài đặt
 
@@ -30,6 +69,40 @@ npm run dev
 
 Mở [http://localhost:3000](http://localhost:3000) để xem app.
 
+**Lưu ý Windows/PowerShell**: Nếu gặp lỗi `npm.ps1 cannot be loaded`, dùng `npm.cmd` thay cho `npm`:
+
+```bash
+npm.cmd run dev
+npm.cmd run build
+npm.cmd run lint
+```
+
+## Cấu hình Google Maps API
+
+Để sử dụng Google Maps, Geocoding, Directions và Distance Matrix, bạn cần:
+
+1. **Tạo file `.env.local`** trong thư mục root của project:
+
+```env
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+2. **Lấy API key** từ [Google Cloud Console](https://console.cloud.google.com/):
+   - Tạo project mới hoặc chọn project cũ
+   - Tạo API key
+   - Bật các API sau:
+     - Maps JavaScript API
+     - Geocoding API
+     - Directions API
+     - Distance Matrix API
+
+3. **Sao chép API key** vào `.env.local`
+
+**Lưu ý quan trọng:**
+- Không bao giờ commit `.env.local` lên repository (đã thêm vào `.gitignore`)
+- Không share API key thật công khai
+- App sẽ hoạt động bình thường offline và hiển thị fallback khi thiếu API key
+
 ## Build production
 
 ```bash
@@ -37,31 +110,21 @@ npm run build
 npm start
 ```
 
-## Lint code
+## Kiểm tra lint
 
 ```bash
 npm run lint
 ```
 
-## Cấu hình Google Maps API
+### Kiểm tra toàn bộ
 
-Để sử dụng Google Maps, Geocoding, Directions và Distance Matrix, bạn cần:
+Trước khi commit/push lên GitHub, chạy:
 
-1. Tạo file `.env.local` trong thư mục root:
-
+```bash
+npm run lint
+npm run build
+git status --short
 ```
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-```
-
-2. Lấy API key từ [Google Cloud Console](https://console.cloud.google.com/)
-
-3. Bật các API sau:
-   - Maps JavaScript API
-   - Geocoding API
-   - Directions API
-   - Distance Matrix API
-
-**Lưu ý**: Không commit API key lên repository. File `.env.local` không được tracked by git.
 
 ## Chế độ Offline / PWA
 
@@ -116,80 +179,264 @@ Service worker tự động đăng ký ở chế độ production.
 ## Cấu trúc dự án
 
 ```
-app/
-├── home/                    # Trang chủ
-├── orders/                  # Quản lý đơn giao
-├── route-planner/           # Lập tuyến
-├── route/[id]/
-│   ├── delivery/            # Theo dõi giao hàng
-│   ├── orders/              # Xem đơn của tuyến
-│   └── scan/                # Quét OCR
-├── history/                 # Lịch sử tuyến
-├── layout.tsx               # Root layout + PWA metadata
-└── globals.css              # Tailwind + global styles
-
-components/
-├── OfflineStatusBanner.tsx   # Banner cảnh báo offline
-├── PwaInstallHint.tsx        # Hướng dẫn cài PWA
-├── RootClientWrapper.tsx     # Client wrapper (service worker)
-├── MapView.tsx              # Google Maps viewer
-└── [other components]
-
-lib/
-├── mapUtils.ts              # Google Maps utilities
-├── geocoding.ts             # Geocoding API
-├── directions.ts            # Directions API
-├── distanceMatrix.ts        # Distance Matrix API
-├── deliveryStorage.ts       # Order localStorage
-├── routeStorage.ts          # Route localStorage
-└── [other utilities]
-
-public/
-├── manifest.json            # PWA manifest
-├── sw.js                    # Service Worker
-├── icons/
-│   ├── icon-192.svg         # PWA icon 192x192
-│   └── icon-512.svg         # PWA icon 512x512
-└── [other assets]
-
-hooks/
-└── useOnlineStatus.ts       # Hook kiểm tra online status
+ShipRoute AI/
+├── app/                           # Next.js App Router pages
+│   ├── layout.tsx                 # Root layout + PWA metadata
+│   ├── page.tsx                   # Home/index
+│   ├── home/                      # Dashboard
+│   ├── orders/                    # Quản lý đơn giao
+│   ├── customers/                 # Khách hàng thường xuyên
+│   ├── route-planner/             # Lập tuyến
+│   ├── history/                   # Lịch sử tuyến
+│   ├── reports/                   # Báo cáo nâng cao
+│   ├── settings/                  # Cài đặt, API key
+│   ├── route/[id]/
+│   │   ├── delivery/              # Theo dõi giao hàng
+│   │   ├── orders/                # Xem đơn của tuyến
+│   │   └── scan/                  # Quét OCR
+│   ├── globals.css                # Tailwind + global styles
+│   └── page.tsx                   # Route-specific pages
+│
+├── components/                    # React components
+│   ├── Dashboard.tsx              # Trang chủ
+│   ├── OrderForm.tsx              # Form tạo/sửa đơn
+│   ├── MapView.tsx                # Bản đồ Google Maps
+│   ├── OperatingCostCalculator.tsx # Tính chi phí
+│   ├── ReportPanel.tsx            # Báo cáo
+│   ├── OfflineStatusBanner.tsx    # Banner offline
+│   ├── RootClientWrapper.tsx      # Service worker + online status
+│   └── [more components]
+│
+├── lib/                           # Utilities & helpers
+│   ├── types.ts                   # TypeScript interfaces
+│   ├── deliveryStorage.ts         # Order storage
+│   ├── routeHistoryStorage.ts     # Route history storage
+│   ├── customerStorage.ts         # Customer storage
+│   ├── costStorage.ts             # Cost settings storage
+│   ├── mapUtils.ts                # Maps utilities
+│   ├── geocoding.ts               # Geocoding API
+│   ├── directions.ts              # Directions API
+│   ├── distanceMatrix.ts          # Distance Matrix API
+│   ├── backupUtils.ts             # Backup/export/import
+│   ├── reportExport.ts            # Report export
+│   ├── smartSuggestions.ts        # Smart suggestions
+│   ├── dashboardStats.ts          # Dashboard calculations
+│   └── [more utilities]
+│
+├── hooks/                         # React hooks
+│   └── useOnlineStatus.ts         # Online/offline detection
+│
+├── public/                        # Static files
+│   ├── manifest.json              # PWA manifest
+│   ├── sw.js                      # Service Worker
+│   ├── favicon.ico                # App icon
+│   └── icons/                     # PWA icons
+│
+├── package.json                   # Dependencies
+├── tsconfig.json                  # TypeScript config
+├── tailwind.config.ts             # Tailwind CSS config
+├── next.config.ts                 # Next.js config
+├── eslint.config.mjs              # ESLint config
+├── postcss.config.mjs             # PostCSS config
+├── .gitignore                     # Git ignore patterns
+├── README.md                      # This file
+└── RELEASE_NOTES.md               # Release notes (optional)
 ```
-
-## Lưu trữ dữ liệu
-
-Tất cả dữ liệu được lưu tại:
-- `localStorage` (mặc định trong browser)
-- Local cơ sở dữ liệu của thiết bị (không cần server)
-
-Không có backend / database server - app hoạt động 100% cục bộ.
-
-## Backup & Restore
-
-App có tính năng:
-- Export toàn bộ dữ liệu dưới dạng JSON
-- Import dữ liệu từ file JSON
-
-Xem "Backup dữ liệu" trong app để sử dụng.
 
 ## Troubleshooting
 
-### App không mở được offline
+### App không mở được / Hydration error
 
-1. Kiểm tra service worker đã đăng ký chưa (DevTools → Application → Service Workers)
-2. Xóa cache và reload
+1. Kiểm tra console DevTools (F12 → Console)
+2. Xóa cache trình duyệt: `Ctrl+Shift+Delete` (Chrome/Edge) hoặc `Ctrl+Shift+Delete` (Firefox)
 3. Chạy `npm run build` lại
+4. Khởi động lại dev server: `npm run dev`
 
 ### Google Maps không hiển thị
 
-- Kiểm tra API key ở `.env.local`
+- Kiểm tra `.env.local` có API key không
 - Đảm bảo có kết nối mạng
-- Xem console DevTools để lỗi chi tiết
+- Xem console DevTools để lỗi chi tiết (Network tab, Console tab)
+- Kiểm tra API key không bị hết quota
+
+### Geocoding/Directions/Distance Matrix báo lỗi
+
+- Kiểm tra `.env.local` có API key không
+- Kiểm tra API đã bật trên Google Cloud Console không
+- Nếu offline, các API Google sẽ không hoạt động
 
 ### Dữ liệu bị mất
 
-- Kiểm tra `localStorage` trong DevTools → Application → Local Storage
-- Khôi phục từ file backup nếu có
+- Kiểm tra `localStorage` trong DevTools: F12 → Application → Local Storage → http://localhost:3000
+- Khôi phục từ file backup JSON nếu có
+- Nếu vô tình xóa, không thể khôi phục (khuyến cáo: backup thường xuyên)
+
+### Service Worker không đăng ký
+
+1. Kiểm tra: DevTools → Application → Service Workers
+2. Chỉ hoạt động ở production build
+3. Chạy `npm run build` để test
+
+### App chậm
+
+- Xóa cache: DevTools → Application → Clear storage
+- Rebuild: `npm run build` → `npm start`
+- Kiểm tra console cho error/warning lớn
+
+## Ghi chú phát triển
+
+- **Giai đoạn hiện tại**: Local-first, không backend
+- **Kế tiếp (nếu cần)**: Có thể thêm backend/database/auth sau
+- **Module có thể mở rộng**: Tất cả module đều kế thừa từ types.ts, có thể extend
+- **Google API**: Đã bọc fallback an toàn, không crash khi offline/thiếu key
+
+## Lưu trữ dữ liệu & Backup
+
+### Dữ liệu local
+Tất cả dữ liệu được lưu cục bộ trên thiết bị bằng `localStorage` trình duyệt. **Không có backend server hoặc database cloud**.
+
+Dữ liệu gồm:
+- Danh sách đơn giao
+- Tuyến đường hiện tại
+- Lịch sử tuyến
+- Khách hàng thường xuyên
+- Cài đặt chi phí vận hành
+- Dữ liệu báo cáo
+
+### Backup dữ liệu
+**Khuyến cáo**: Thực hiện backup định kỳ để tránh mất dữ liệu.
+
+App cung cấp chức năng:
+- **Export JSON**: Xuất toàn bộ dữ liệu thành file `.json`
+- **Export CSV**: Xuất danh sách đơn thành file `.csv`
+- **Import JSON**: Khôi phục dữ liệu từ file backup
+
+Truy cập chức năng Backup tại: **Settings → Backup dữ liệu**
+
+### Lưu ý quan trọng
+- Nếu xóa cache/cookies trình duyệt, dữ liệu sẽ mất
+- Nếu đổi máy, cần import backup từ máy cũ
+- Khôi phục từ Drive/cloud cá nhân là trách nhiệm người dùng
+
+## Git & GitHub
+
+### File không commit
+
+**Tuyệt đối không commit các file sau:**
+
+```
+.env.local
+.env*.local
+node_modules/
+.next/
+.idea/
+.vscode/
+*.log
+*.tmp.driveupload
+*.tmp.drivedownload
+```
+
+Các file này đã được thêm vào `.gitignore`.
+
+### Nếu project nằm trên Google Drive
+
+Project có thể nằm trong thư mục Desktop đang sync Google Drive, gây phát sinh file tạm:
+
+```
+*.tmp.driveupload
+*.tmp.drivedownload
+```
+
+**Khuyến cáo**: Chuyển project ra thư mục không sync Drive, ví dụ:
+
+```
+C:\Development\shiproute-ai
+```
+
+Hoặc loại trừ project khỏi Drive sync.
+
+### Workflow push GitHub
+
+Trước khi push lên GitHub:
+
+```bash
+# 1. Kiểm tra trạng thái
+git status --short
+
+# 2. Kiểm tra lint/build
+npm run lint
+npm run build
+
+# 3. Commit nếu có thay đổi
+git add -A
+git commit -m "Describe your changes"
+
+# 4. Push
+git push origin master
+```
+
+## Checklist kiểm tra trước release
+
+### Tự động
+```bash
+npm run lint       # Kiểm tra code quality
+npm run build      # Build production
+```
+
+### Thủ công - Quản lý đơn
+- [ ] Dashboard mở được, hiển thị thống kê
+- [ ] Thêm đơn giao được
+- [ ] Chỉnh sửa đơn giao được
+- [ ] Xóa đơn giao được
+- [ ] Tìm kiếm, lọc đơn giao được
+
+### Thủ động - Lập tuyến & Bản đồ
+- [ ] Lập tuyến từ danh sách đơn được
+- [ ] Tối ưu tuyến local được (không cần API key)
+- [ ] Bản đồ hiển thị khi có API key
+- [ ] Bản đồ hiển thị fallback khi thiếu API key
+- [ ] Bản đồ hiển thị fallback khi offline
+
+### Thủ động - Geocoding & Directions
+- [ ] Geocoding báo lỗi rõ ràng khi thiếu API key
+- [ ] Geocoding báo lỗi rõ ràng khi offline
+- [ ] Directions báo lỗi rõ ràng khi thiếu API key
+- [ ] Distance Matrix báo lỗi rõ ràng khi thiếu API key
+
+### Thủ động - Dữ liệu & Backup
+- [ ] Lịch sử tuyến hiển thị được
+- [ ] Export JSON backup hoạt động
+- [ ] Export CSV hoạt động
+- [ ] Import JSON backup không crash app
+- [ ] Dữ liệu khách hàng thường xuyên lưu được
+
+### Thủ động - Báo cáo
+- [ ] Báo cáo tổng hợp đơn/tuyến/chi phí được
+- [ ] Export báo cáo JSON hoạt động
+- [ ] Export báo cáo CSV hoạt động
+- [ ] In báo cáo hoạt động (`Ctrl+P`)
+
+### Thủ động - UI/UX
+- [ ] Không có chữ trắng trên nền sáng
+- [ ] Không tràn ngang trên mobile (375px)
+- [ ] Không tràn ngang trên tablet (768px)
+- [ ] Responsive tốt trên desktop
+- [ ] Không có console error/warning
+
+### Thủ động - Offline
+- [ ] Offline banner hiển thị khi mất mạng
+- [ ] Quản lý đơn vẫn dùng được offline
+- [ ] Lập tuyến local vẫn dùng được offline
+- [ ] Backup vẫn dùng được offline
+- [ ] Báo cáo vẫn dùng được offline
+
+### Git & Repository
+- [ ] Không commit `.env.local`
+- [ ] Không commit `node_modules/`
+- [ ] Không commit `.next/`
+- [ ] Không commit `.idea/` hoặc `.vscode/`
+- [ ] Không commit `*.log`
+- [ ] Không commit file tạm Google Drive
 
 ## License
 

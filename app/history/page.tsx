@@ -35,7 +35,6 @@ export default function HistoryPage() {
   const totalCompleted = routes.filter((r) => r.status === "completed").length;
   const totalOrders = routes.reduce((s, r) => s + (r.totalOrders || 0), 0);
   const totalDistanceMeters = routes.reduce((s, r) => s + (r.totalDistanceMeters || 0), 0);
-  const totalDurationSeconds = routes.reduce((s, r) => s + (r.totalDurationSeconds || 0), 0);
 
   return (
     <MobilePageShell title="Lịch sử tuyến" showBack>

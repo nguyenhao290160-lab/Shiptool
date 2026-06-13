@@ -33,6 +33,7 @@ import { RoutePointCard } from "@/components/RoutePointCard";
 import { RouteStats } from "@/components/RouteStats";
 import { DirectionsPanel } from "@/components/DirectionsPanel";
 import { DistanceMatrixSummary } from "@/lib/distanceMatrix";
+import { OperatingCostCalculator } from "@/components/OperatingCostCalculator";
 
 // ── Helper: convert DeliveryOrder → RoutePoint ──────────────────────
 
@@ -836,6 +837,20 @@ export default function RoutePlannerPage() {
           <>
             {/* Stats */}
             <RouteStats points={plan.points} startPoint={plan.startPoint} />
+
+            {/* ── Operating Cost Calculator (Prompt 15) ── */}
+            {plan && (
+              <OperatingCostCalculator
+                totalDistanceKm={
+                  optimizeStats?.after?.distance
+                    ? parseFloat(optimizeStats.after.distance.replace(" km", ""))
+                    : directions?.totalDistanceValue
+                      ? directions.totalDistanceValue / 1000
+                      : undefined
+                }
+                totalOrders={plan.points.length}
+              />
+            )}
 
             {/* Draw directions button */}
             <button

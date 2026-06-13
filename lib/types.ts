@@ -128,6 +128,7 @@ export interface RouteHistoryItem {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  costEstimate?: RouteCostEstimate; // Operating cost snapshot (Prompt 15)
 }
 
 // ── Map View (Prompt 4) ─────────────────────────────────────────────
@@ -150,4 +151,55 @@ export interface MapDeliveryMarker {
   priority: DeliveryPriority;
   lat: number;
   lng: number;
+}
+
+// ── Operating Cost (Prompt 15) ───────────────────────────────────────
+
+export interface OperatingCostSettings {
+  fuelPricePerLiter: number;
+  fuelConsumptionPer100Km: number;
+  maintenanceCostPerKm?: number;
+  otherCostPerRoute?: number;
+  defaultShippingFeePerOrder?: number;
+  currency: "VND";
+  updatedAt: string;
+}
+
+export interface RouteCostEstimate {
+  routeId?: string;
+  totalDistanceKm: number;
+  totalOrders: number;
+  fuelLiters: number;
+  fuelCost: number;
+  maintenanceCost: number;
+  otherCost: number;
+  totalOperatingCost: number;
+  estimatedRevenue: number;
+  estimatedProfit: number;
+  costPerOrder: number;
+  revenuePerOrder: number;
+  profitPerOrder: number;
+  calculatedAt: string;
+}
+
+// ── Frequent Customer (Prompt 16A) ───────────────────────────────────
+
+export interface FrequentCustomer {
+  id: string;
+  name: string;
+  phone?: string;
+  address: string;
+  note?: string;
+  lat?: number;
+  lng?: number;
+  geocodedAddress?: string;
+  placeId?: string;
+  totalOrders: number;
+  deliveredOrders: number;
+  failedOrders: number;
+  cancelledOrders: number;
+  lastOrderAt?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
 }

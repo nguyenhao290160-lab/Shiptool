@@ -3,7 +3,7 @@
  * Supports exporting to JSON and CSV, importing backups, and managing local data.
  */
 
-import { DeliveryOrder, DeliveryRoutePlan, RouteHistoryItem } from "./types";
+import { DeliveryOrder, DeliveryRoutePlan, RouteHistoryItem, OperatingCostSettings, FrequentCustomer } from "./types";
 
 const ORDERS_KEY = "shiproute_delivery_orders";
 const ROUTE_PLAN_KEY = "shiproute_route_plan";
@@ -15,6 +15,8 @@ export interface ShipRouteBackupData {
   orders?: DeliveryOrder[];
   routePlan?: DeliveryRoutePlan | null;
   routeHistory?: RouteHistoryItem[];
+  costSettings?: OperatingCostSettings;
+  customers?: FrequentCustomer[];
   metadata?: {
     totalOrders?: number;
     totalRoutePoints?: number;
@@ -41,12 +43,16 @@ export const getAllLocalData = (): ShipRouteBackupData => {
     const orders = localStorage.getItem(ORDERS_KEY);
     const routePlan = localStorage.getItem(ROUTE_PLAN_KEY);
     const routeHistory = localStorage.getItem("shiproute_route_history");
+    const costSettings = localStorage.getItem("shiproute_cost_settings");
+    const customers = localStorage.getItem("shiproute_frequent_customers");
 
     const parsedOrders = orders ? (JSON.parse(orders) as DeliveryOrder[]) : [];
     const parsedRoutePlan = routePlan
       ? (JSON.parse(routePlan) as DeliveryRoutePlan)
       : null;
     const parsedRouteHistory = routeHistory ? (JSON.parse(routeHistory) as RouteHistoryItem[]) : [];
+    const parsedCostSettings = costSettings ? (JSON.parse(costSettings) as OperatingCostSettings) : undefined;
+    const parsedCustomers = customers ? (JSON.parse(customers) as FrequentCustomer[]) : [];
 
     return {
       version: "1.0",
@@ -55,6 +61,8 @@ export const getAllLocalData = (): ShipRouteBackupData => {
       orders: parsedOrders,
       routePlan: parsedRoutePlan,
       routeHistory: parsedRouteHistory,
+      costSettings: parsedCostSettings,
+      customers: parsedCustomers,
       metadata: {
         totalOrders: parsedOrders.length,
         totalRoutePoints: parsedRoutePlan?.points?.length || 0,
@@ -160,6 +168,16 @@ export const importBackupJSON = (data: ShipRouteBackupData): {
     // Restore route history (if present)
     if (data.routeHistory && Array.isArray(data.routeHistory)) {
       localStorage.setItem("shiproute_route_history", JSON.stringify(data.routeHistory));
+    }
+
+    // Restore cost settings (Prompt 15)
+    if (data.costSettings) {
+      localStorage.setItem("shiproute_cost_settings", JSON.stringify(data.costSettings));
+    }
+
+    // Restore customers (Prompt 16A)
+    if (data.customers && Array.isArray(data.customers)) {
+      localStorage.setItem("shiproute_frequent_customers", JSON.stringify(data.customers));
     }
 
     return {

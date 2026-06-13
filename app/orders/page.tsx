@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { DeliveryOrder, DeliveryStatus } from "@/lib/types";
+import { DeliveryOrder, DeliveryStatus, DeliveryPriority } from "@/lib/types";
 import {
   seedDemoOrdersIfEmpty,
   getDeliveryOrders,
@@ -51,6 +51,39 @@ export default function OrdersPage() {
     const timer = setTimeout(() => {
       const loaded = seedDemoOrdersIfEmpty();
       setOrders(loaded);
+
+      // Check for prefill order coming from customer card
+      try {
+        const raw = localStorage.getItem("shiproute_prefill_order");
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<DeliveryOrder>;
+          // Create a temp order object for prefill
+          const prefill: DeliveryOrder = {
+            id: Date.now().toString(),
+            customerName: parsed.customerName || "",
+            phone: parsed.phone || "",
+            address: parsed.address || "",
+            note: parsed.note || "",
+            status: (parsed.status as DeliveryStatus) || "pending",
+            priority: (parsed.priority as DeliveryPriority) || "normal",
+            lat: parsed.lat,
+            lng: parsed.lng,
+            geocodedAddress: parsed.geocodedAddress,
+            placeId: parsed.placeId,
+            geocodingStatus: "idle",
+            geocodingError: undefined,
+            createdAt: parsed.createdAt || new Date().toISOString(),
+            updatedAt: parsed.updatedAt || new Date().toISOString(),
+          };
+
+          setEditingOrder(prefill);
+          setShowForm(true);
+          localStorage.removeItem("shiproute_prefill_order");
+        }
+      } catch (err) {
+        console.error("Error parsing prefill order", err);
+      }
+
       setIsMounted(true);
     }, 0);
     return () => clearTimeout(timer);
