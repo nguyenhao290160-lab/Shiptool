@@ -1,13 +1,30 @@
 import { HELP_TOPICS, HelpTopic } from "./appHelpKnowledge";
 import { appFeatures, AppFeature } from "./appFeatureRegistry";
 
-function normalize(text: string): string {
-  // Remove diacritics, lowercase, remove punctuation, normalize spaces
+export interface AiHelpResponse {
+  text: string;
+  suggestions: string[];
+}
+
+export function removeVietnameseAccents(text: string): string {
+  let result = text.toLowerCase();
+  result = result.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  result = result.replace(/đ/g, "d");
+  result = result.replace(/Đ/g, "d");
+  result = result.replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, "a");
+  result = result.replace(/[èéẹẻẽêềếệểễ]/g, "e");
+  result = result.replace(/[ìíịỉĩ]/g, "i");
+  result = result.replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, "o");
+  result = result.replace(/[ùúụủũưừứựửữ]/g, "u");
+  result = result.replace(/[ỳýỵỷỹ]/g, "y");
+  // Keep alphanumeric and spaces
+  return result.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function normalizeText(text: string): string {
   return text
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
-    .replace(/[.,!?/\\()\[\]{}"'`@:;–—]/g, " ")
+    .replace(/[.,!?/\\()\[\]{}"'`@:;–—\-+_]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -17,10 +34,12 @@ function featureToTopic(f: AppFeature): HelpTopic {
     id: f.id,
     title: f.name,
     keywords: f.keywords,
+    synonyms: [],
     summary: f.shortDescription,
     steps: f.userGuide,
     relatedModules: f.relatedFeatures,
-  } as HelpTopic;
+    suggestedFollowUps: f.commonQuestions?.map((q) => q.question) || [],
+  };
 }
 
 export function getAllFeatureNames(): string[] {
@@ -29,52 +48,6 @@ export function getAllFeatureNames(): string[] {
 
 export function getNewFeatures(): AppFeature[] {
   return appFeatures.filter((f) => f.status === "new" || f.status === "beta");
-}
-
-export function searchFeatures(question: string): AppFeature[] {
-  const q = normalize(question);
-  if (!q) return [];
-  const qWords = q.split(" ");
-  const results: Array<{ f: AppFeature; score: number }> = [];
-
-  for (const f of appFeatures) {
-    let s = 0;
-    const allKeys = [...f.keywords, f.id, f.name];
-    for (const kw of allKeys) {
-      const nkw = normalize(kw);
-      if (!nkw) continue;
-      if (nkw.split(" ").every((w) => qWords.includes(w))) s += 4;
-      else if (q.includes(nkw)) s += 3;
-      else {
-        for (const w of nkw.split(" ")) {
-          if (w && qWords.includes(w)) s += 1.5;
-          else if (w && q.includes(w)) s += 1;
-        }
-      }
-    }
-    if (q.includes(normalize(f.id))) s += 2;
-    if (s > 0) results.push({ f, score: s });
-  }
-
-  results.sort((a, b) => b.score - a.score);
-  return results.map((r) => r.f);
-}
-
-export function getFeatureReply(question: string): string {
-  const found = searchFeatures(question);
-  if (found.length === 0) return "Không tìm thấy tính năng phù hợp. Bạn có thể hỏi 'App có những tính năng gì?' hoặc xem danh sách tính năng.";
-  const f = found[0];
-  let reply = `🔎 ${f.name}\n${f.shortDescription}`;
-  if (f.userGuide && f.userGuide.length > 0) {
-    reply += "\n\nHướng dẫn (các bước):\n" + f.userGuide.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  }
-  if (f.commonQuestions && f.commonQuestions.length > 0) {
-    reply += "\n\nCâu hỏi thường gặp:\n" + f.commonQuestions.map((q) => `- ${q.question}: ${q.answer}`).join("\n");
-  }
-  if (f.troubleshooting && f.troubleshooting.length > 0) {
-    reply += "\n\nKhắc phục sự cố:\n" + f.troubleshooting.map((t) => `- ${t.problem}: ${t.solution}`).join("\n");
-  }
-  return reply;
 }
 
 export function getFeatureHelpTopics(): HelpTopic[] {
@@ -86,65 +59,229 @@ export function getCombinedHelpTopics(): HelpTopic[] {
   return [...HELP_TOPICS, ...dynamic];
 }
 
-export function getAiHelpReply(question: string): string {
-  const q = normalize(question);
-  if (!q) {
-    return "Vui lòng nhập câu hỏi hoặc chọn một câu hỏi gợi ý.";
+/**
+ * Scores a topic based on how well it matches the user's question
+ */
+export function scoreTopic(question: string, topic: HelpTopic): number {
+  let score = 0;
+  
+  const qNorm = normalizeText(question);
+  const qAccentless = removeVietnameseAccents(qNorm);
+  
+  const qWords = qNorm.split(" ").filter(Boolean);
+  const qAccentlessWords = qAccentless.split(" ").filter(Boolean);
+  
+  if (qWords.length === 0) return 0;
+
+  // 1. Match title
+  const titleNorm = normalizeText(topic.title);
+  const titleAccentless = removeVietnameseAccents(titleNorm);
+  
+  if (qNorm === titleNorm || qAccentless === titleAccentless) {
+    score += 15;
+  } else if (qNorm.includes(titleNorm)) {
+    score += 10;
+  } else if (qAccentless.includes(titleAccentless)) {
+    score += 8;
   }
 
-  // special queries
-  if (q.includes("app có") || q.includes("có tính năng")) {
-    const names = getAllFeatureNames();
-    return `Các tính năng chính của app: ${names.slice(0, 12).join(", ")}.\nBạn có thể hỏi "Tính năng mới là gì?" hoặc "Hướng dẫn dùng [tên tính năng]".`;
+  // 2. Match ID
+  const idNorm = normalizeText(topic.id);
+  if (qNorm === idNorm || qAccentless === idNorm) {
+    score += 12;
+  } else if (qNorm.includes(idNorm)) {
+    score += 6;
   }
 
-  if (q.includes("tính năng mới") || q.includes("có gì mới") || q.includes("mới")) {
-    const newFs = getNewFeatures();
-    if (newFs.length === 0) return "Hiện chưa có tính năng mới. Bạn có thể kiểm tra lại sau.";
-    return (
-      "Các tính năng mới / beta:\n" +
-      newFs.map((f) => `- ${f.name}: ${f.shortDescription}`).join("\n") +
-      "\n\nBạn có thể hỏi 'Hướng dẫn dùng <tên tính năng>' để xem chi tiết."
-    );
-  }
-
-  // check if user asks guidance about specific feature
-  if (q.startsWith("hướng dẫn") || q.startsWith("cách") || q.startsWith("làm sao") || q.includes("hướng dẫn dùng") || q.includes("cách sử dụng")) {
-    const featureReply = getFeatureReply(question);
-    if (!featureReply.includes("Không tìm thấy tính năng")) return featureReply;
-  }
-
-  // fallback to combined topics matching
-  const topics = getCombinedHelpTopics();
-  // simple scoring similar to previous implementation
-  const qWords = q.split(" ");
-  const scores: Array<{ topic: HelpTopic; score: number }> = [];
-
-  for (const t of topics) {
-    let s = 0;
-    for (const kw of t.keywords || []) {
-      const nkw = normalize(kw);
-      if (nkw.split(" ").every((w) => qWords.includes(w))) s += 4;
-      else if (q.includes(nkw)) s += 3;
-      else {
-        for (const w of nkw.split(" ")) {
-          if (w && qWords.includes(w)) s += 1.5;
+  // 3. Match keywords
+  for (const kw of topic.keywords || []) {
+    const kwNorm = normalizeText(kw);
+    const kwAccentless = removeVietnameseAccents(kwNorm);
+    
+    if (qNorm === kwNorm || qAccentless === kwAccentless) {
+      score += 10;
+    } else if (qNorm.includes(kwNorm)) {
+      score += 8;
+    } else if (qAccentless.includes(kwAccentless)) {
+      score += 7;
+    } else {
+      // Word overlap for multi-word keywords
+      const kwWords = kwAccentless.split(" ").filter(Boolean);
+      let matchCount = 0;
+      for (const w of kwWords) {
+        if (qAccentlessWords.includes(w)) {
+          matchCount++;
         }
       }
+      if (matchCount > 0 && kwWords.length > 0) {
+        score += (matchCount / kwWords.length) * 4;
+      }
     }
-    if (q.includes(normalize(t.id))) s += 2;
-    if (s > 0) scores.push({ topic: t, score: s });
   }
 
-  scores.sort((a, b) => b.score - a.score);
-
-  if (scores.length === 0) {
-    const suggestions = topics.slice(0, 8).map((t) => t.title).join(", ");
-    return `Mình chưa hiểu rõ. Bạn có thể hỏi về: ${suggestions}.`;
+  // 4. Match synonyms
+  for (const syn of topic.synonyms || []) {
+    const synNorm = normalizeText(syn);
+    const synAccentless = removeVietnameseAccents(synNorm);
+    
+    if (qNorm === synNorm || qAccentless === synAccentless) {
+      score += 9;
+    } else if (qNorm.includes(synNorm)) {
+      score += 7;
+    } else if (qAccentless.includes(synAccentless)) {
+      score += 6;
+    } else {
+      // Word overlap for multi-word synonyms
+      const synWords = synAccentless.split(" ").filter(Boolean);
+      let matchCount = 0;
+      for (const w of synWords) {
+        if (qAccentlessWords.includes(w)) {
+          matchCount++;
+        }
+      }
+      if (matchCount > 0 && synWords.length > 0) {
+        score += (matchCount / synWords.length) * 3.5;
+      }
+    }
   }
 
-  const best = scores[0].topic;
-  let reply = `🔎 ${best.title}\n${best.summary}`;
-  if (best.steps && best.steps.length > 0) reply += "\n\nHướng dẫn (các bước):\n" + best.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  return reply;
+  return score;
+}
+
+export function getAiHelpReply(question: string): AiHelpResponse {
+  const qNorm = normalizeText(question);
+  const qAccentless = removeVietnameseAccents(qNorm);
+
+  const defaultSuggestions = [
+    "Cách thêm đơn giao?",
+    "Cách lập tuyến giao hàng?",
+    "Vì sao bản đồ không hiện?",
+    "Cách backup dữ liệu?",
+    "Tối ưu tuyến là gì?",
+  ];
+
+  if (!qNorm) {
+    return {
+      text: "Vui lòng nhập câu hỏi hoặc chọn một câu hỏi gợi ý bên dưới nhé! 😊",
+      suggestions: defaultSuggestions,
+    };
+  }
+
+  // 1. Greeting detection
+  const greetings = [
+    "xin chao", "chao", "hello", "hi", "hey", "chao ban", "chao tro ly", 
+    "chao ai", "tro ly oi", "ai oi", "chào bạn", "chào", "xin chào"
+  ];
+  if (greetings.some((g) => qNorm === g || qAccentless === removeVietnameseAccents(g) || qAccentless.startsWith(removeVietnameseAccents(g) + " "))) {
+    return {
+      text: "Xin chào! 👋 Tôi là Trợ lý ShipRoute AI.\n\nTôi có thể giúp bạn tìm hiểu về:\n• Bảng điều khiển (Dashboard)\n• Quản lý đơn giao hàng\n• Lập tuyến đường & tối ưu\n• Cài đặt Google Maps API\n• Backup & dữ liệu local\n• Xử lý sự cố/Lỗi thường gặp\n\nBạn muốn tìm hiểu chủ đề nào?",
+      suggestions: defaultSuggestions,
+    };
+  }
+
+  // 2. Thanks detection
+  const thanks = ["cam on", "thank", "cảm ơn", "ok", "được rồi", "duoc roi", "cam on ban", "cám ơn"];
+  if (thanks.some((t) => qNorm === t || qAccentless.includes(removeVietnameseAccents(t)))) {
+    return {
+      text: "Không có chi! 😊 Nếu bạn có thêm thắc mắc gì khác trong quá trình sử dụng ShipRoute AI, cứ hỏi tôi nhé. Tôi luôn sẵn sàng hỗ trợ!",
+      suggestions: defaultSuggestions,
+    };
+  }
+
+  // 3. System capabilities check
+  if (
+    qAccentless.includes("app co") || 
+    qAccentless.includes("co tinh nang") || 
+    qAccentless.includes("app co gi") || 
+    qAccentless.includes("chuc nang")
+  ) {
+    const names = getAllFeatureNames();
+    return {
+      text: `📋 **Các tính năng chính của ShipRoute AI:**\n\n${names.slice(0, 12).map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nBạn có thể hỏi hướng dẫn chi tiết của từng tính năng bằng cách gõ: *"Hướng dẫn dùng [tên tính năng]"*.`,
+      suggestions: [
+        "Cách thêm đơn giao?",
+        "Cách lập tuyến giao hàng?",
+        "Tính năng mới có gì?",
+        "Cách backup dữ liệu?",
+      ],
+    };
+  }
+
+  if (qAccentless.includes("tinh nang moi") || qAccentless.includes("co gi moi")) {
+    const newFs = getNewFeatures();
+    if (newFs.length === 0) {
+      return {
+        text: "Hiện tại hệ thống hoạt động ổn định và chưa có tính năng mới được triển khai thêm. Bạn có thể kiểm tra lại sau nhé!",
+        suggestions: defaultSuggestions,
+      };
+    }
+    return {
+      text: `🆕 **Các tính năng mới / đang thử nghiệm:**\n\n${newFs.map((f) => `• **${f.name}**: ${f.shortDescription}`).join("\n")}\n\nBạn có thể gõ câu hỏi chi tiết về các tính năng này để biết thêm thông tin.`,
+      suggestions: newFs.map((f) => `Cách dùng ${f.name}?`).slice(0, 4),
+    };
+  }
+
+  // 4. Score all topics and find the best match
+  const topics = getCombinedHelpTopics();
+  const scoredTopics = topics
+    .map((topic) => ({ topic, score: scoreTopic(question, topic) }))
+    .filter((x) => x.score > 1.5) // Minimum score threshold to avoid garbage matches
+    .sort((a, b) => b.score - a.score);
+
+  if (scoredTopics.length === 0) {
+    // Smart low-confidence fallback
+    return {
+      text: "Mình chưa hiểu rõ câu hỏi này. 🤔\n\nBạn có thể hỏi mình về: cách thêm đơn giao, lập tuyến giao hàng, cấu hình Google Maps API, backup dữ liệu, lỗi bản đồ không hiện, hoặc tối ưu tuyến.",
+      suggestions: [
+        "Cách thêm đơn giao?",
+        "Cách lập tuyến giao hàng?",
+        "Cấu hình Google Maps?",
+        "Backup dữ liệu?",
+        "Lỗi bản đồ không hiện?",
+        "Tối ưu tuyến là gì?",
+      ],
+    };
+  }
+
+  // Best match details
+  const bestMatch = scoredTopics[0].topic;
+  let replyText = `🔎 **${bestMatch.title}**\n\n${bestMatch.summary}`;
+  
+  if (bestMatch.steps && bestMatch.steps.length > 0) {
+    replyText += "\n\n📝 **Các bước thực hiện:**\n" + bestMatch.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
+  }
+
+  // Related topics
+  if (scoredTopics.length > 1) {
+    const relatedTitles = scoredTopics
+      .slice(1, 3)
+      .map((x) => x.topic.title);
+    replyText += `\n\n💡 *Chủ đề liên quan: ${relatedTitles.join(", ")}*`;
+  }
+
+  // Dynamic suggestions
+  let suggestions = bestMatch.suggestedFollowUps || [];
+  if (suggestions.length === 0) {
+    // Fallback to related modules or default questions
+    if (bestMatch.relatedModules && bestMatch.relatedModules.length > 0) {
+      // Find related topics by ID to get their questions or names
+      suggestions = bestMatch.relatedModules
+        .map((mId) => {
+          const found = topics.find((t) => t.id === mId);
+          return found ? `Tìm hiểu ${found.title}?` : "";
+        })
+        .filter(Boolean)
+        .slice(0, 4);
+    }
+  }
+
+  // Make sure we have at least some suggestions
+  if (suggestions.length === 0) {
+    suggestions = defaultSuggestions;
+  }
+
+  return {
+    text: replyText,
+    suggestions: suggestions,
+  };
 }

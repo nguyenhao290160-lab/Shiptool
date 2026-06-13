@@ -59,12 +59,15 @@ export function PerformanceDashboard() {
   useEffect(() => {
     try {
       const lastBackupTime = localStorage.getItem("shiproute_last_backup_time");
+      let val = false;
       if (!lastBackupTime) {
-        setNeedsBackup(true);
+        val = true;
       } else {
         const backupTime = parseInt(lastBackupTime, 10);
-        setNeedsBackup(Date.now() - backupTime > 24 * 60 * 60 * 1000);
+        val = Date.now() - backupTime > 24 * 60 * 60 * 1000;
       }
+      const t = setTimeout(() => setNeedsBackup(val), 0);
+      return () => clearTimeout(t);
     } catch {
       // ignore
     }

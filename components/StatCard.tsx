@@ -22,13 +22,13 @@ export function StatCard({
   const isSm = size === "sm";
 
   return (
-    <div className={`${bgColor} rounded-2xl p-${isSm ? 3 : 4} border border-slate-200`}>
+    <div className={`${bgColor} rounded-xl border border-slate-200/60 ${isSm ? "p-3" : "p-4"}`} style={{ boxShadow: "var(--shadow-sm)" }}>
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <p className={`text-${isSm ? "xs" : "sm"} text-slate-600 font-medium`}>{label}</p>
-          <p className={`text-${isSm ? "xl" : "2xl"} font-bold ${textColor} mt-1`}>{value}</p>
+          <p className={`text-slate-600 font-semibold ${isSm ? "text-xs" : "text-sm"}`}>{label}</p>
+          <p className={`font-black ${textColor} mt-1 ${isSm ? "text-xl" : "text-2xl"}`}>{value}</p>
         </div>
-        <div className={`text-${isSm ? "2xl" : "4xl"}`}>{icon}</div>
+        <div className={`${isSm ? "text-2xl" : "text-3xl"}`}>{icon}</div>
       </div>
     </div>
   );

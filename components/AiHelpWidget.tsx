@@ -10,7 +10,7 @@ const CHAT_KEY = "shiproute_ai_help_chat";
 const OPEN_KEY = "shiproute_ai_help_open";
 const MAX_MESSAGES = 30;
 
-/* ── Inline SVG Icons (no external deps required) ──────────────────── */
+/* ── Inline SVG Icons ──────────────────────────────────────────────── */
 
 function BotIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
@@ -68,6 +68,9 @@ function MessageCircleIcon({ className = "w-7 h-7" }: { className?: string }) {
   );
 }
 
+const WELCOME_MESSAGE =
+  "Xin chào! 👋 Tôi là Trợ lý ShipRoute AI.\n\nTôi có thể hướng dẫn bạn về:\n• Dashboard & tổng quan\n• Quản lý đơn giao\n• Lập tuyến đường\n• Google Maps API\n• Backup dữ liệu\n• Lỗi thường gặp\n\nHãy chọn câu hỏi gợi ý hoặc nhập câu hỏi bên dưới!";
+
 export default function AiHelpWidget() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -76,12 +79,23 @@ export default function AiHelpWidget() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Only render after mount to prevent hydration mismatch
+  const DEFAULT_QUESTIONS = [
+    "Cách thêm đơn giao?",
+    "Cách lập tuyến giao hàng?",
+    "Cách lấy tọa độ?",
+    "Vì sao bản đồ không hiện?",
+    "Cách backup dữ liệu?",
+    "Tối ưu tuyến là gì?",
+  ];
+  const [quickQuestions, setQuickQuestions] = useState<string[]>(DEFAULT_QUESTIONS);
+
   useEffect(() => {
-    setMounted(true);
+    const t = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
 
-  // load saved chat after mount
   useEffect(() => {
     if (!mounted) return;
     const t = setTimeout(() => {
@@ -91,62 +105,46 @@ export default function AiHelpWidget() {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setMessages(parsed.slice(-MAX_MESSAGES));
-            // restore open state if saved
             try {
               const openSaved = localStorage.getItem(OPEN_KEY);
               if (openSaved === "1") setOpen(true);
-            } catch {}
+            } catch { /* ignore */ }
             return;
           }
         }
-      } catch {
-        // ignore
-      }
-      // no saved messages -> welcome
+      } catch { /* ignore */ }
       setMessages([
-        {
-          id: `m-${idRef.current++}`,
-          sender: "assistant",
-          text:
-            "Xin chào! Tôi là Trợ lý ShipRoute AI. Tôi có thể hướng dẫn bạn quản lý đơn giao, lập tuyến, dùng bản đồ, lấy tọa độ, backup dữ liệu, xem báo cáo và xử lý lỗi thường gặp.",
-        },
+        { id: `m-${idRef.current++}`, sender: "assistant", text: WELCOME_MESSAGE },
       ]);
-
-      // restore open state if saved
       try {
         const openSaved = localStorage.getItem(OPEN_KEY);
         if (openSaved === "1") setOpen(true);
-      } catch {}
+      } catch { /* ignore */ }
     }, 0);
-
     return () => clearTimeout(t);
   }, [mounted]);
 
-  // save chat (trimmed)
   useEffect(() => {
     if (!mounted) return;
     try {
       const toSave = messages.slice(-MAX_MESSAGES);
       localStorage.setItem(CHAT_KEY, JSON.stringify(toSave));
-    } catch {}
+    } catch { /* ignore */ }
   }, [messages, mounted]);
 
-  // save open state
   useEffect(() => {
     if (!mounted) return;
     try {
       localStorage.setItem(OPEN_KEY, open ? "1" : "0");
-    } catch {}
+    } catch { /* ignore */ }
   }, [open, mounted]);
 
   useEffect(() => {
-    // auto-scroll
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, open]);
 
-  // close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -161,11 +159,9 @@ export default function AiHelpWidget() {
     const userMsg: Message = { id: `u-${uid}`, sender: "user", text: q };
     setMessages((m) => [...m, userMsg]);
 
-    // If server-side AI enabled via env flag, try server first
     const aiEnabled = typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_AI_HELP_ENABLED === 'true');
 
     if (aiEnabled && typeof navigator !== 'undefined' && navigator.onLine) {
-      // show loading assistant message
       const loadingId = `a-${idRef.current++}`;
       const loadingMsg: Message = { id: loadingId, sender: 'assistant', text: 'Đang suy nghĩ...' };
       setMessages((m) => [...m, loadingMsg]);
@@ -173,50 +169,47 @@ export default function AiHelpWidget() {
       try {
         const history: { role: 'user' | 'assistant'; content: string }[] = messages.map((m) => ({ role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.text })).slice(-10);
         const res = await askServerAiHelp({ question: q, chatHistory: history });
-        // remove loading message and append final
         setMessages((m) => m.filter((x) => x.id !== loadingId));
 
         if (res.ok && res.answer) {
           const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: 'assistant', text: res.answer };
           setMessages((m) => [...m, assistantMsg]);
+          setQuickQuestions(DEFAULT_QUESTIONS);
           return;
         }
 
-        // fallback to local rule-based
-        const replyText = getAiHelpReply(q);
-        const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: 'assistant', text: replyText };
+        const reply = getAiHelpReply(q);
+        const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: 'assistant', text: reply.text };
         setMessages((m) => [...m, assistantMsg]);
+        setQuickQuestions(reply.suggestions);
       } catch {
-        // On error, fallback to local
         setMessages((m) => m.filter((x) => x.id !== loadingId));
-        const replyText = getAiHelpReply(q);
-        const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: 'assistant', text: replyText };
+        const reply = getAiHelpReply(q);
+        const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: 'assistant', text: reply.text };
         setMessages((m) => [...m, assistantMsg]);
+        setQuickQuestions(reply.suggestions);
       }
-
       return;
     }
 
-    // Default: local rule-based reply
-    const replyText = getAiHelpReply(q);
-    const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: "assistant", text: replyText };
-    // simulate small delay
-    setTimeout(() => setMessages((m) => [...m, assistantMsg]), 200);
+    const reply = getAiHelpReply(q);
+    const assistantMsg: Message = { id: `a-${idRef.current++}`, sender: "assistant", text: reply.text };
+    setTimeout(() => {
+      setMessages((m) => [...m, assistantMsg]);
+      setQuickQuestions(reply.suggestions);
+    }, 200);
   };
 
-  // Clear chat with confirmation
   const clearChat = () => {
     if (!confirm("Xóa lịch sử chat trợ lý? Hành động này không thể hoàn tác.")) return;
     const welcome: Message = {
       id: `m-${idRef.current++}`,
       sender: "assistant",
-      text:
-        "Xin chào! Tôi là Trợ lý ShipRoute AI. Tôi có thể hướng dẫn bạn quản lý đơn giao, lập tuyến, dùng bản đồ, lấy tọa độ, backup dữ liệu, xem báo cáo và xử lý lỗi thường gặp.",
+      text: WELCOME_MESSAGE,
     };
     setMessages([welcome]);
-    try {
-      localStorage.removeItem(CHAT_KEY);
-    } catch {}
+    setQuickQuestions(DEFAULT_QUESTIONS);
+    try { localStorage.removeItem(CHAT_KEY); } catch { /* ignore */ }
   };
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -226,53 +219,42 @@ export default function AiHelpWidget() {
     setInput("");
   };
 
-  const quickQuestions = [
-    "Cách thêm đơn giao?",
-    "Cách lập tuyến giao hàng?",
-    "Cách lấy tọa độ?",
-    "Vì sao bản đồ không hiện?",
-    "Cách tối ưu tuyến?",
-    "Cách backup dữ liệu?",
-    "Cách import backup?",
-    "Cách xem báo cáo?",
-    "Dữ liệu có bị mất không?",
-    "Cách cấu hình API key?",
-    "App có chạy offline không?",
-    "Cách thêm khách hàng thường xuyên?",
-    "Cách tính chi phí vận hành?",
-    "Làm sao deploy Vercel?",
-  ];
 
-  // Don't render anything until mounted to prevent hydration mismatch
+
   if (!mounted) return null;
 
   return (
     <>
-      {/* ── Chat Panel ──────────────────────────────────────────────── */}
+      {/* ── Chat Panel ────────────────────────────────────────────── */}
       <div
         aria-hidden={!open}
         role="dialog"
         aria-label="Trợ lý ShipRoute AI"
-        className={`fixed bottom-24 right-3 sm:right-5 z-[9990] transition-all duration-300 ease-out ${
+        className={`fixed z-[9990] transition-all duration-300 ease-out ${
           open
             ? "opacity-100 translate-y-0 scale-100"
             : "opacity-0 pointer-events-none translate-y-4 scale-95"
         }`}
-        style={{ transformOrigin: "bottom right" }}
+        style={{
+          transformOrigin: "bottom right",
+          bottom: "96px",
+          right: "12px",
+        }}
       >
         <div
-          className="flex flex-col overflow-hidden shadow-2xl border"
+          className="flex flex-col overflow-hidden"
           style={{
-            width: "min(calc(100vw - 24px), 400px)",
-            maxHeight: "min(75vh, 600px)",
+            width: "min(calc(100vw - 24px), 420px)",
+            maxHeight: "min(80vh, 620px)",
             borderRadius: "20px",
             background: "linear-gradient(180deg, #0f172a 0%, #1e293b 100%)",
-            borderColor: "rgba(148, 163, 184, 0.15)",
+            border: "1px solid rgba(148, 163, 184, 0.12)",
+            boxShadow: "0 25px 60px -12px rgba(0, 0, 0, 0.4), 0 0 40px rgba(14, 165, 233, 0.08)",
           }}
         >
-          {/* ── Header ─────────────────────────────────────────────── */}
+          {/* ── Header ─────────────────────────────────────────── */}
           <div
-            className="flex items-center gap-3 px-4 py-3 shrink-0"
+            className="flex items-center gap-3 px-4 py-3.5 shrink-0"
             style={{
               background: "linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)",
             }}
@@ -280,10 +262,10 @@ export default function AiHelpWidget() {
             <div
               className="flex items-center justify-center shrink-0"
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: "12px",
-                background: "rgba(255,255,255,0.2)",
+                width: 40,
+                height: 40,
+                borderRadius: "14px",
+                background: "rgba(255,255,255,0.18)",
                 backdropFilter: "blur(8px)",
               }}
             >
@@ -306,11 +288,11 @@ export default function AiHelpWidget() {
                 <span className="text-white/70 text-xs">Sẵn sàng hỗ trợ</span>
               </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 aria-label="Xóa hội thoại"
                 onClick={clearChat}
-                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
+                className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
                 title="Xóa hội thoại"
               >
                 <TrashIcon className="w-4 h-4" />
@@ -318,7 +300,7 @@ export default function AiHelpWidget() {
               <button
                 aria-label="Đóng trợ lý"
                 onClick={() => setOpen(false)}
-                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
+                className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200"
                 title="Đóng"
               >
                 <XIcon className="w-4 h-4" />
@@ -326,26 +308,26 @@ export default function AiHelpWidget() {
             </div>
           </div>
 
-          {/* ── Messages ───────────────────────────────────────────── */}
+          {/* ── Messages ───────────────────────────────────────── */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3"
+            className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3 premium-scrollbar"
             tabIndex={0}
             aria-label="Lịch sử chat AI"
-            style={{ minHeight: 200 }}
+            style={{ minHeight: 220 }}
           >
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"} animate-fade-in-up`}
               >
                 {m.sender === "assistant" && (
                   <div
-                    className="shrink-0 flex items-center justify-center mr-2 mt-1"
+                    className="shrink-0 flex items-center justify-center mr-2.5 mt-1"
                     style={{
                       width: 28,
                       height: 28,
-                      borderRadius: "8px",
+                      borderRadius: "10px",
                       background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
                     }}
                   >
@@ -353,7 +335,7 @@ export default function AiHelpWidget() {
                   </div>
                 )}
                 <div
-                  className="max-w-[80%] text-sm leading-relaxed"
+                  className="max-w-[82%] text-sm leading-relaxed"
                   style={{
                     padding: "10px 14px",
                     borderRadius:
@@ -363,18 +345,19 @@ export default function AiHelpWidget() {
                     background:
                       m.sender === "user"
                         ? "linear-gradient(135deg, #0ea5e9, #0284c7)"
-                        : "rgba(51, 65, 85, 0.6)",
+                        : "rgba(51, 65, 85, 0.5)",
                     color:
                       m.sender === "user"
                         ? "#ffffff"
                         : "#e2e8f0",
                     backdropFilter: m.sender === "assistant" ? "blur(8px)" : undefined,
+                    border: m.sender === "assistant" ? "1px solid rgba(148, 163, 184, 0.08)" : undefined,
                   }}
                   role="region"
                   aria-live="polite"
                 >
                   {m.text.split("\n").map((line, i) => (
-                    <p key={i} className="whitespace-pre-wrap">
+                    <p key={i} className={`whitespace-pre-wrap ${i > 0 ? "mt-1" : ""}`}>
                       {line}
                     </p>
                   ))}
@@ -383,33 +366,33 @@ export default function AiHelpWidget() {
             ))}
           </div>
 
-          {/* ── Suggestion Chips ────────────────────────────────────── */}
+          {/* ── Suggestion Chips ──────────────────────────────── */}
           <div
             className="px-4 pt-2 pb-1 shrink-0"
-            style={{ borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}
+            style={{ borderTop: "1px solid rgba(148, 163, 184, 0.08)" }}
           >
             <div
               className="flex flex-wrap gap-1.5"
               aria-label="Câu hỏi gợi ý"
             >
-              {quickQuestions.slice(0, 6).map((q) => (
+              {quickQuestions.map((q) => (
                 <button
                   key={q}
-                  className="text-xs py-1.5 px-3 rounded-full transition-all duration-200 whitespace-nowrap"
+                  className="text-xs py-1.5 px-3 rounded-full transition-all duration-200 whitespace-nowrap border"
                   style={{
-                    background: "rgba(51, 65, 85, 0.5)",
+                    background: "rgba(51, 65, 85, 0.4)",
                     color: "#94a3b8",
-                    border: "1px solid rgba(148, 163, 184, 0.15)",
+                    borderColor: "rgba(148, 163, 184, 0.12)",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(14, 165, 233, 0.2)";
+                    e.currentTarget.style.background = "rgba(14, 165, 233, 0.15)";
                     e.currentTarget.style.color = "#38bdf8";
-                    e.currentTarget.style.borderColor = "rgba(14, 165, 233, 0.4)";
+                    e.currentTarget.style.borderColor = "rgba(14, 165, 233, 0.3)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(51, 65, 85, 0.5)";
+                    e.currentTarget.style.background = "rgba(51, 65, 85, 0.4)";
                     e.currentTarget.style.color = "#94a3b8";
-                    e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.15)";
+                    e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.12)";
                   }}
                   onClick={() => sendQuestion(q)}
                   tabIndex={0}
@@ -420,7 +403,7 @@ export default function AiHelpWidget() {
             </div>
           </div>
 
-          {/* ── Input Area ──────────────────────────────────────────── */}
+          {/* ── Input Area ────────────────────────────────────── */}
           <div className="px-4 pb-4 pt-2 shrink-0">
             <form onSubmit={handleSubmit} className="flex items-center gap-2">
               <input
@@ -428,19 +411,19 @@ export default function AiHelpWidget() {
                 placeholder="Hỏi bất cứ điều gì..."
                 className="flex-1 text-sm outline-none placeholder-slate-500"
                 style={{
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                  background: "rgba(51, 65, 85, 0.5)",
-                  border: "1px solid rgba(148, 163, 184, 0.15)",
+                  padding: "11px 16px",
+                  borderRadius: "14px",
+                  background: "rgba(51, 65, 85, 0.4)",
+                  border: "1px solid rgba(148, 163, 184, 0.12)",
                   color: "#e2e8f0",
                   transition: "border-color 0.2s, box-shadow 0.2s",
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(14, 165, 233, 0.5)";
-                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(14, 165, 233, 0.1)";
+                  e.currentTarget.style.borderColor = "rgba(14, 165, 233, 0.4)";
+                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(14, 165, 233, 0.08)";
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.15)";
+                  e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.12)";
                   e.currentTarget.style.boxShadow = "none";
                 }}
                 value={input}
@@ -459,25 +442,26 @@ export default function AiHelpWidget() {
                 aria-label="Gửi tin nhắn"
                 className="shrink-0 flex items-center justify-center transition-all duration-200"
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "12px",
+                  width: 42,
+                  height: 42,
+                  borderRadius: "14px",
                   background: input.trim()
                     ? "linear-gradient(135deg, #0ea5e9, #6366f1)"
-                    : "rgba(51, 65, 85, 0.5)",
+                    : "rgba(51, 65, 85, 0.4)",
                   color: input.trim() ? "#ffffff" : "#64748b",
                   cursor: input.trim() ? "pointer" : "not-allowed",
                   transform: "scale(1)",
+                  boxShadow: input.trim() ? "0 4px 12px rgba(14, 165, 233, 0.2)" : "none",
                 }}
                 onMouseEnter={(e) => {
                   if (input.trim()) {
                     e.currentTarget.style.transform = "scale(1.05)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(14, 165, 233, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(14, 165, 233, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.boxShadow = input.trim() ? "0 4px 12px rgba(14, 165, 233, 0.2)" : "none";
                 }}
               >
                 <SendIcon className="w-4 h-4" />
@@ -487,12 +471,12 @@ export default function AiHelpWidget() {
         </div>
       </div>
 
-      {/* ── Floating Button ─────────────────────────────────────────── */}
+      {/* ── Floating Button ─────────────────────────────────────── */}
       <button
         aria-label={open ? "Đóng trợ lý ShipRoute AI" : "Mở trợ lý ShipRoute AI"}
         id="ai-help-toggle"
         onClick={() => setOpen((s) => !s)}
-        className="fixed bottom-5 right-5 z-[9990] flex items-center justify-center transition-all duration-300 ease-out"
+        className="fixed bottom-5 right-3 sm:right-5 z-[9990] flex items-center justify-center transition-all duration-300 ease-out"
         style={{
           width: 60,
           height: 60,
@@ -502,7 +486,7 @@ export default function AiHelpWidget() {
             : "linear-gradient(135deg, #0ea5e9, #6366f1)",
           boxShadow: open
             ? "0 4px 14px rgba(71, 85, 105, 0.3)"
-            : "0 4px 20px rgba(14, 165, 233, 0.35), 0 0 40px rgba(99, 102, 241, 0.15)",
+            : "0 4px 24px rgba(14, 165, 233, 0.3), 0 0 40px rgba(99, 102, 241, 0.12)",
           transform: "scale(1)",
         }}
         onMouseEnter={(e) => {
@@ -512,7 +496,7 @@ export default function AiHelpWidget() {
           e.currentTarget.style.transform = "scale(1)";
         }}
         onMouseDown={(e) => {
-          e.currentTarget.style.transform = "scale(0.95)";
+          e.currentTarget.style.transform = "scale(0.93)";
         }}
         onMouseUp={(e) => {
           e.currentTarget.style.transform = "scale(1.1)";
@@ -529,8 +513,25 @@ export default function AiHelpWidget() {
           <span
             className="absolute inset-0 rounded-full animate-ping"
             style={{
-              background: "rgba(14, 165, 233, 0.2)",
+              background: "rgba(14, 165, 233, 0.15)",
               animationDuration: "2.5s",
+            }}
+          />
+        )}
+
+        {/* Online indicator dot */}
+        {!open && (
+          <span
+            className="absolute"
+            style={{
+              top: 2,
+              right: 2,
+              width: 14,
+              height: 14,
+              borderRadius: "9999px",
+              background: "#4ade80",
+              border: "2.5px solid #1e293b",
+              boxShadow: "0 0 6px rgba(74,222,128,0.5)",
             }}
           />
         )}

@@ -2,18 +2,17 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { MobilePageShell } from "@/components/MobilePageShell";
 import { SettingsApiCenter } from "@/components/SettingsApiCenter";
 
 export default function SettingsPage() {
   const router = useRouter();
 
   return (
-    <MobilePageShell>
-      <div className="space-y-5">
+    <div className="page-container">
+      <main className="flex-1 p-4 md:p-6 flex flex-col gap-5 pb-24">
         <button
           onClick={() => router.push("/home")}
-          className="flex items-center gap-2 text-cyan-600 hover:text-cyan-700 font-semibold text-sm mb-4"
+          className="flex items-center gap-2 text-cyan-600 hover:text-cyan-700 font-semibold text-sm transition-colors"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -27,7 +26,7 @@ export default function SettingsPage() {
           Quay lại
         </button>
         <SettingsApiCenter />
-      </div>
-    </MobilePageShell>
+      </main>
+    </div>
   );
 }

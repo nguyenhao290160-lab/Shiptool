@@ -299,7 +299,7 @@ export default function OrdersPage() {
 
   if (!isMounted) {
     return (
-      <div className="min-h-[100dvh] bg-slate-50 flex flex-col max-w-3xl mx-auto">
+      <div className="min-h-[100dvh] bg-slate-50 flex flex-col max-w-4xl mx-auto">
         <div className="p-6" />
       </div>
     );
@@ -308,14 +308,15 @@ export default function OrdersPage() {
   // ── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex flex-col max-w-3xl mx-auto shadow-xl">
+    <div className="min-h-[100dvh] bg-slate-50 flex flex-col max-w-4xl mx-auto">
       {/* ── Header ── */}
-      <header className="bg-white sticky top-0 z-30 border-b border-slate-200 shadow-sm">
+      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200/80" style={{ boxShadow: "var(--shadow-sm)" }}>
         <div className="px-5 pt-4 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/home")}
-              className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-700 transition-colors"
+              className="p-2 -ml-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
+              aria-label="Quay lại"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

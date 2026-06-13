@@ -8,35 +8,43 @@ interface Props {
 
 const MAP: Record<string, string> = {
   // delivery statuses
-  pending: "bg-amber-100 text-amber-800 border-amber-200",
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
   delivering: "bg-cyan-50 text-cyan-700 border-cyan-200",
-  delivered: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  failed: "bg-red-100 text-red-700 border-red-200",
-  cancelled: "bg-gray-100 text-gray-700 border-gray-200",
-  skipped: "bg-gray-100 text-gray-700 border-gray-200",
+  delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  failed: "bg-red-50 text-red-700 border-red-200",
+  cancelled: "bg-slate-100 text-slate-600 border-slate-200",
+  skipped: "bg-slate-100 text-slate-600 border-slate-200",
 
   // priorities
-  high: "bg-red-100 text-red-700 border-red-200",
-  normal: "bg-slate-100 text-slate-700 border-slate-200",
-  low: "bg-slate-50 text-slate-600 border-slate-100",
+  high: "bg-rose-50 text-rose-700 border-rose-200",
+  normal: "bg-slate-50 text-slate-600 border-slate-200",
+  low: "bg-sky-50 text-sky-600 border-sky-200",
 
   // api/system
-  online: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  offline: "bg-amber-50 text-amber-800 border-amber-200",
-  configured: "bg-cyan-50 text-cyan-700 border-cyan-200",
-  unconfigured: "bg-red-50 text-red-700 border-red-200",
-  success: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  error: "bg-red-50 text-red-700 border-red-200",
+  online: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  offline: "bg-amber-50 text-amber-700 border-amber-200",
+  configured: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  unconfigured: "bg-rose-50 text-rose-700 border-rose-200",
+  success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  error: "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+const LABELS: Record<string, string> = {
+  pending: "Chờ giao",
+  delivering: "Đang giao",
+  delivered: "Đã giao",
+  failed: "Thất bại",
+  cancelled: "Hủy",
+  skipped: "Bỏ qua",
 };
 
 export const StatusBadge = ({ state, size = "md", className = "" }: Props) => {
-  const cls = MAP[state] || "bg-slate-100 text-slate-700 border-slate-200";
-  const sizeCls = size === "sm" ? "text-xs px-2 py-0.5 rounded-full" : "text-sm px-3 py-1 rounded-full";
+  const cls = MAP[state] || "bg-slate-100 text-slate-600 border-slate-200";
+  const sizeCls = size === "sm" ? "text-xs px-2.5 py-0.5" : "text-xs px-3 py-1";
 
   return (
-    <span className={`inline-flex items-center font-semibold ${sizeCls} ${cls} ${className} border`}>
-      {state === "pending" ? "Chờ giao" : state === "delivering" ? "Đang giao" : state === "delivered" ? "Đã giao" : state === "failed" ? "Thất bại" : state === "cancelled" ? "Hủy" : state === "skipped" ? "Bỏ qua" : state}
+    <span className={`inline-flex items-center font-bold rounded-full border ${sizeCls} ${cls} ${className}`}>
+      {LABELS[state] || state}
     </span>
   );
 };
-

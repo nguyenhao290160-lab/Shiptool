@@ -6,7 +6,9 @@ export function useOnlineStatus() {
 
   useEffect(() => {
     // Set the initial value once mounted on the client
-    setIsOnline(navigator.onLine);
+    const t = setTimeout(() => {
+      setIsOnline(navigator.onLine);
+    }, 0);
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -15,6 +17,7 @@ export function useOnlineStatus() {
     window.addEventListener("offline", handleOffline);
 
     return () => {
+      clearTimeout(t);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };

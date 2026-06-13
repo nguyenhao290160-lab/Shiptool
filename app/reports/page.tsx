@@ -108,8 +108,11 @@ export default function ReportsPage() {
   // Set date defaults after mount to avoid SSR/CSR mismatch
   React.useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    setCustomFrom((prev) => prev || today);
-    setCustomTo((prev) => prev || today);
+    const t = setTimeout(() => {
+      setCustomFrom((prev) => prev || today);
+      setCustomTo((prev) => prev || today);
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
 
   const { fromDate, toDate } = useMemo(() => {
@@ -274,204 +277,226 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Báo cáo nâng cao</h1>
+    <div className="page-container">
+      <main className="flex-1 p-4 md:p-6 flex flex-col gap-5 pb-24">
+        {/* Header */}
+        <div className="relative overflow-hidden rounded-2xl p-6 text-center" style={{ background: "var(--gradient-hero)" }}>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl" />
+          <div className="relative z-10">
+            <h1 className="text-2xl font-black text-white mb-1">Báo cáo nâng cao</h1>
+            <p className="text-slate-300 text-sm">Phân tích hiệu suất giao hàng</p>
+          </div>
+        </div>
 
-      <section className="mb-4 bg-white p-3 rounded shadow">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Khoảng thời gian</label>
-            <div className="flex gap-2 mt-1">
-              <select value={range} onChange={(e) => setRange(e.target.value)} className="border rounded px-2 py-1">
-                <option value="today">Hôm nay</option>
-                <option value="7">7 ngày gần đây</option>
-                <option value="30">30 ngày gần đây</option>
-                <option value="custom">Tùy chọn</option>
+        {/* Filters */}
+        <section className="card-premium">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Khoảng thời gian</label>
+              <div className="flex gap-2 flex-wrap">
+                <select value={range} onChange={(e) => setRange(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none">
+                  <option value="today">Hôm nay</option>
+                  <option value="7">7 ngày gần đây</option>
+                  <option value="30">30 ngày gần đây</option>
+                  <option value="custom">Tùy chọn</option>
+                </select>
+                {range === "custom" && (
+                  <div className="flex gap-2 items-center">
+                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500/30 outline-none" />
+                    <span className="text-slate-400">—</span>
+                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500/30 outline-none" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Trạng thái</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-cyan-500/30 outline-none">
+                <option value="all">Tất cả</option>
+                <option value="pending">Chờ giao</option>
+                <option value="delivering">Đang giao</option>
+                <option value="delivered">Đã giao</option>
+                <option value="failed">Thất bại</option>
+                <option value="cancelled">Hủy</option>
               </select>
-              {range === "custom" && (
-                <div className="flex gap-2 items-center">
-                  <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="border rounded px-2 py-1" />
-                  <span>-</span>
-                  <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="border rounded px-2 py-1" />
-                </div>
-              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Ưu tiên</label>
+              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-cyan-500/30 outline-none">
+                <option value="all">Tất cả</option>
+                <option value="high">Cao</option>
+                <option value="normal">Bình thường</option>
+                <option value="low">Thấp</option>
+              </select>
+            </div>
+
+            <div className="sm:ml-auto flex gap-2 flex-wrap">
+              <button onClick={exportJson} className="bg-gradient-to-r from-sky-500 to-sky-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:from-sky-600 hover:to-sky-700 transition-all shadow-sm">Xuất JSON</button>
+              <button onClick={exportCsv} className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-sm">Xuất CSV</button>
+              <button onClick={onPrint} className="bg-white text-slate-700 px-4 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">In báo cáo</button>
             </div>
           </div>
+        </section>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Trạng thái đơn</label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1 mt-1">
-              <option value="all">Tất cả</option>
-              <option value="pending">Chờ giao</option>
-              <option value="delivering">Đang giao</option>
-              <option value="delivered">Đã giao</option>
-              <option value="failed">Thất bại</option>
-              <option value="cancelled">Hủy</option>
-            </select>
-          </div>
+        {/* Summary Stats */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { label: "Tổng số đơn", value: summary.totalOrders, color: "text-sky-600", bg: "bg-sky-50" },
+            { label: "Đã giao", value: summary.deliveredOrders, color: "text-emerald-600", bg: "bg-emerald-50" },
+            { label: "Tỷ lệ thành công", value: `${summary.successRate}%`, color: "text-cyan-600", bg: "bg-cyan-50" },
+            { label: "Ưu tiên cao", value: summary.highPriorityOrders, color: "text-rose-600", bg: "bg-rose-50" },
+            { label: "Có tọa độ", value: summary.ordersWithCoordinates, color: "text-indigo-600", bg: "bg-indigo-50" },
+            { label: "Thiếu tọa độ", value: summary.ordersMissingCoordinates, color: "text-amber-600", bg: "bg-amber-50" },
+          ].map((s) => (
+            <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-200/60`} style={{ boxShadow: "var(--shadow-sm)" }}>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.label}</div>
+              <div className={`text-2xl font-black mt-1 ${s.color}`}>{s.value}</div>
+            </div>
+          ))}
+        </section>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Ưu tiên</label>
-            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="border rounded px-2 py-1 mt-1">
-              <option value="all">Tất cả</option>
-              <option value="high">Cao</option>
-              <option value="normal">Bình thường</option>
-              <option value="low">Thấp</option>
-            </select>
-          </div>
-
-          <div className="ml-auto flex gap-2">
-            <button onClick={exportJson} className="bg-sky-600 text-white px-3 py-1 rounded">Xuất báo cáo JSON</button>
-            <button onClick={exportCsv} className="bg-emerald-600 text-white px-3 py-1 rounded">Xuất CSV</button>
-            <button onClick={onPrint} className="bg-gray-600 text-white px-3 py-1 rounded">In báo cáo</button>
-          </div>
-        </div>
-      </section>
-
-      <section className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white p-3 rounded shadow">
-          <div className="text-sm text-slate-500">Tổng số đơn</div>
-          <div className="text-xl font-bold">{summary.totalOrders}</div>
-        </div>
-        <div className="bg-white p-3 rounded shadow">
-          <div className="text-sm text-slate-500">Đã giao</div>
-          <div className="text-xl font-bold">{summary.deliveredOrders}</div>
-        </div>
-        <div className="bg-white p-3 rounded shadow">
-          <div className="text-sm text-slate-500">Tỷ lệ thành công</div>
-          <div className="text-xl font-bold">{summary.successRate}%</div>
-        </div>
-
-        <div className="bg-white p-3 rounded shadow">
-          <div className="text-sm text-slate-500">Đơn ưu tiên cao</div>
-          <div className="text-xl font-bold">{summary.highPriorityOrders}</div>
-        </div>
-        <div className="bg-white p-3 rounded shadow">
-          <div className="text-sm text-slate-500">Đơn có tọa độ</div>
-          <div className="text-xl font-bold">{summary.ordersWithCoordinates}</div>
-        </div>
-        <div className="bg-white p-3 rounded shadow">
-          <div className="text-sm text-slate-500">Đơn thiếu tọa độ</div>
-          <div className="text-xl font-bold">{summary.ordersMissingCoordinates}</div>
-        </div>
-      </section>
-
-      <section className="mb-4">
-        <h2 className="text-lg font-semibold mb-2">Danh sách đơn ({filteredOrders.length})</h2>
-        {filteredOrders.length === 0 ? (
-          <div className="bg-white p-4 rounded shadow">Không có dữ liệu phù hợp với bộ lọc hiện tại.</div>
-        ) : (
-          <div className="overflow-x-auto bg-white rounded shadow">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="p-2 text-left">Ngày</th>
-                  <th className="p-2 text-left">Khách</th>
-                  <th className="p-2 text-left">Điện thoại</th>
-                  <th className="p-2 text-left">Địa chỉ</th>
-                  <th className="p-2 text-left">Trạng thái</th>
-                  <th className="p-2 text-left">Ưu tiên</th>
-                  <th className="p-2 text-left">Tọa độ</th>
-                  <th className="p-2 text-left">Ghi chú</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((o) => (
-                  <tr key={o.id} className="border-b">
-                    <td className="p-2">{new Date(o.createdAt).toLocaleString()}</td>
-                    <td className="p-2">{o.customerName ?? "-"}</td>
-                    <td className="p-2">{o.phone ?? "-"}</td>
-                    <td className="p-2">{o.address ?? "-"}</td>
-                    <td className="p-2">{o.status ?? "-"}</td>
-                    <td className="p-2">{o.priority ?? "-"}</td>
-                    <td className="p-2">{typeof o.lat === "number" && typeof o.lng === "number" ? "Có" : "Chưa có"}</td>
-                    <td className="p-2">{o.note ?? ""}</td>
+        {/* Orders Table */}
+        <section>
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Danh sách đơn ({filteredOrders.length})</h2>
+          {filteredOrders.length === 0 ? (
+            <div className="card-premium p-8 text-center text-slate-500">Không có dữ liệu phù hợp với bộ lọc hiện tại.</div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200/80" style={{ boxShadow: "var(--shadow-sm)" }}>
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200/80">
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Ngày</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Khách</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">ĐT</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Địa chỉ</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Trạng thái</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Ưu tiên</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tọa độ</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Ghi chú</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-100">
+                  {filteredOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-3 whitespace-nowrap">{new Date(o.createdAt).toLocaleString()}</td>
+                      <td className="p-3 font-medium">{o.customerName ?? "-"}</td>
+                      <td className="p-3">{o.phone ?? "-"}</td>
+                      <td className="p-3 max-w-[200px] truncate">{o.address ?? "-"}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          o.status === "delivered" ? "bg-emerald-100 text-emerald-700" :
+                          o.status === "pending" ? "bg-amber-100 text-amber-700" :
+                          o.status === "delivering" ? "bg-cyan-100 text-cyan-700" :
+                          o.status === "failed" ? "bg-red-100 text-red-700" :
+                          "bg-slate-100 text-slate-600"
+                        }`}>{o.status ?? "-"}</span>
+                      </td>
+                      <td className="p-3">{o.priority ?? "-"}</td>
+                      <td className="p-3">
+                        <span className={`text-xs font-bold ${typeof o.lat === "number" && typeof o.lng === "number" ? "text-emerald-600" : "text-slate-400"}`}>
+                          {typeof o.lat === "number" && typeof o.lng === "number" ? "✓ Có" : "— Chưa"}
+                        </span>
+                      </td>
+                      <td className="p-3 max-w-[150px] truncate text-slate-500">{o.note ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
-      <section className="mb-4">
-        <h2 className="text-lg font-semibold mb-2">Báo cáo tuyến ({filteredRoutes.length})</h2>
-        {filteredRoutes.length === 0 ? (
-          <div className="bg-white p-4 rounded shadow">Chưa có dữ liệu tuyến trong khoảng thời gian này.</div>
-        ) : (
-          <div className="overflow-x-auto bg-white rounded shadow">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="p-2 text-left">Ngày</th>
-                  <th className="p-2 text-left">Tên tuyến</th>
-                  <th className="p-2 text-left">Trạng thái</th>
-                  <th className="p-2 text-left">Tổng đơn</th>
-                  <th className="p-2 text-left">Tổng km</th>
-                  <th className="p-2 text-left">Tổng thời gian</th>
-                  <th className="p-2 text-left">Chi phí (ước tính)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRoutes.map((r) => (
-                  <tr key={r.id} className="border-b">
-                    <td className="p-2">{r.date ? new Date(r.date).toLocaleString() : "-"}</td>
-                    <td className="p-2">{r.name ?? "-"}</td>
-                    <td className="p-2">{r.status ?? "-"}</td>
-                    <td className="p-2">{r.ordersCount ?? 0}</td>
-                    <td className="p-2">{formatKm(r.totalDistanceKm)}</td>
-                    <td className="p-2">{formatMinutes(r.totalDurationMinutes)}</td>
-                    <td className="p-2">{r.costEstimate ? formatVnd(r.costEstimate) : "-"}</td>
+        {/* Routes Table */}
+        <section>
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Báo cáo tuyến ({filteredRoutes.length})</h2>
+          {filteredRoutes.length === 0 ? (
+            <div className="card-premium p-8 text-center text-slate-500">Chưa có dữ liệu tuyến trong khoảng thời gian này.</div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200/80" style={{ boxShadow: "var(--shadow-sm)" }}>
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200/80">
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Ngày</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tên tuyến</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Trạng thái</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tổng đơn</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Tổng km</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Thời gian</th>
+                    <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Chi phí</th>
                   </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-100">
+                  {filteredRoutes.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-3 whitespace-nowrap">{r.date ? new Date(r.date).toLocaleString() : "-"}</td>
+                      <td className="p-3 font-medium">{r.name ?? "-"}</td>
+                      <td className="p-3">{r.status ?? "-"}</td>
+                      <td className="p-3">{r.ordersCount ?? 0}</td>
+                      <td className="p-3">{formatKm(r.totalDistanceKm)}</td>
+                      <td className="p-3">{formatMinutes(r.totalDurationMinutes)}</td>
+                      <td className="p-3">{r.costEstimate ? formatVnd(r.costEstimate) : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Cost Report */}
+        <section>
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Báo cáo chi phí</h2>
+          {summary.totalOperatingCost === undefined ? (
+            <div className="card-premium p-8 text-center text-slate-500">Chưa có dữ liệu chi phí. Hãy cấu hình Chi phí vận hành để xem báo cáo tài chính.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80" style={{ boxShadow: "var(--shadow-sm)" }}>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng chi phí vận hành</div>
+                <div className="text-2xl font-black text-slate-900 mt-1">{formatVnd(summary.totalOperatingCost ?? 0)}</div>
+              </div>
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80" style={{ boxShadow: "var(--shadow-sm)" }}>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Doanh thu ước tính</div>
+                <div className="text-2xl font-black text-emerald-600 mt-1">{formatVnd(summary.estimatedRevenue ?? 0)}</div>
+              </div>
+              <div className={`rounded-xl p-4 border ${summary.estimatedProfit !== undefined && summary.estimatedProfit < 0 ? "bg-rose-50 border-rose-200/80" : "bg-white border-slate-200/80"}`} style={{ boxShadow: "var(--shadow-sm)" }}>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lợi nhuận ước tính</div>
+                <div className={`text-2xl font-black mt-1 ${summary.estimatedProfit !== undefined && summary.estimatedProfit < 0 ? "text-rose-600" : "text-cyan-600"}`}>{summary.estimatedProfit !== undefined ? formatVnd(summary.estimatedProfit) : "-"}</div>
+                {summary.estimatedProfit !== undefined && summary.estimatedProfit < 0 && (
+                  <div className="text-xs text-rose-600 mt-2 font-medium">Lưu ý: tuyến đang lỗ theo ước tính.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Customer Report */}
+        <section className="mb-4">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Báo cáo khách hàng</h2>
+          {(!customers || customers.length === 0) ? (
+            <div className="card-premium p-8 text-center text-slate-500">Chưa có dữ liệu khách hàng thường xuyên.</div>
+          ) : (
+            <div className="card-premium">
+              <div className="text-sm text-slate-700">Tổng khách hàng thường xuyên: <strong className="text-slate-900">{customers.length}</strong></div>
+              <div className="mt-3 text-sm font-semibold text-slate-700">Top 5 khách theo tổng đơn:</div>
+              <ol className="mt-2 space-y-1.5">
+                {customers.slice().sort((a,b)=> (b.totalOrders||0)-(a.totalOrders||0)).slice(0,5).map((c: FrequentCustomer)=> (
+                  <li key={c.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-sm">
+                    <span className="font-medium text-slate-800">{c.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-cyan-600">{c.totalOrders || 0} đơn</span>
+                      <span className={`text-xs font-bold ${c.lat && c.lng ? "text-emerald-600" : "text-slate-400"}`}>
+                        {c.lat && c.lng ? "✓ Tọa độ" : "— Chưa"}
+                      </span>
+                    </div>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Báo cáo chi phí</h2>
-        {summary.totalOperatingCost === undefined ? (
-          <div className="bg-white p-4 rounded shadow">Chưa có dữ liệu chi phí. Hãy cấu hình Chi phí vận hành để xem báo cáo tài chính.</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-white p-3 rounded shadow">
-              <div className="text-sm text-slate-500">Tổng chi phí vận hành</div>
-              <div className="text-xl font-bold">{formatVnd(summary.totalOperatingCost ?? 0)}</div>
+              </ol>
             </div>
-            <div className="bg-white p-3 rounded shadow">
-              <div className="text-sm text-slate-500">Doanh thu ước tính</div>
-              <div className="text-xl font-bold">{formatVnd(summary.estimatedRevenue ?? 0)}</div>
-            </div>
-            <div className={`p-3 rounded shadow ${summary.estimatedProfit !== undefined && summary.estimatedProfit < 0 ? "bg-rose-50" : "bg-white"}`}>
-              <div className="text-sm text-slate-500">Lợi nhuận ước tính</div>
-              <div className="text-xl font-bold">{summary.estimatedProfit !== undefined ? formatVnd(summary.estimatedProfit) : "-"}</div>
-              {summary.estimatedProfit !== undefined && summary.estimatedProfit < 0 && (
-                <div className="text-sm text-rose-700 mt-2">Lưu ý: tuyến đang lỗ theo ước tính chi phí vận hành.</div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Báo cáo khách hàng</h2>
-        {(!customers || customers.length === 0) ? (
-          <div className="bg-white p-4 rounded shadow">Chưa có dữ liệu khách hàng thường xuyên.</div>
-        ) : (
-          <div className="bg-white p-4 rounded shadow">
-            <div>Tổng khách hàng thường xuyên: <strong>{customers.length}</strong></div>
-            <div className="mt-2">Top 5 khách theo tổng đơn:</div>
-            <ol className="mt-1 list-decimal ml-5">
-              {customers.slice().sort((a,b)=> (b.totalOrders||0)-(a.totalOrders||0)).slice(0,5).map((c: FrequentCustomer)=> (
-                <li key={c.id}>{c.name} — {c.totalOrders || 0} đơn {c.lat && c.lng ? "(Có tọa độ)" : "(Chưa có tọa độ)"}</li>
-              ))}
-            </ol>
-          </div>
-        )}
-      </section>
-
+          )}
+        </section>
+      </main>
     </div>
   );
 }
