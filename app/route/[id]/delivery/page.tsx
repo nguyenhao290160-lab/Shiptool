@@ -4,7 +4,9 @@ import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { MobilePageShell } from "@/components/MobilePageShell";
 import { getRouteById, saveRoute } from "@/lib/storage";
-import { RoutePlan, OrderStop } from "@/lib/types";
+import { RoutePlan, OrderStop, DeliveryStatus } from "@/lib/types";
+import { getDeliveryOrderById, saveDeliveryOrder } from "@/lib/deliveryStorage";
+import { DeliveryOrder } from "@/lib/types";
 import { buildGoogleMapsSearchUrl } from "@/lib/maps";
 import { buildPhoneCallUrl, maskPhoneNumber } from "@/lib/phone";
 
@@ -33,33 +35,74 @@ export default function DeliveryPage({ params }: { params: Promise<{ id: string 
   const currentIndex = route.currentStopIndex;
   const stop = route.stops[currentIndex];
 
-  const updateStopStatus = (status: OrderStop["status"]) => {
+  const updateStopStatus = async (status: DeliveryStatus) => {
     const updatedStops = [...route.stops];
-     
-    updatedStops[currentIndex] = { ...stop, status, updatedAt: new Date().toISOString() };
-    
+
+    const now = new Date().toISOString();
+    const updatedStop: OrderStop = { ...stop, status, updatedAt: now } as OrderStop;
+
+    // If delivered, ask for optional recipient name / note
+    if (status === "delivered") {
+      const recipient = window.prompt("Tên người nhận (tùy chọn)", stop.recipientName || "") || undefined;
+      const note = window.prompt("Ghi chú giao (tùy chọn)", stop.deliveryNote || "") || undefined;
+      if (recipient) updatedStop.recipientName = recipient;
+      if (note) updatedStop.deliveryNote = note;
+      updatedStop.deliveredAt = now;
+    }
+
+    // If failed, ask for reason
+    if (status === "failed") {
+      const reason = window.prompt("Lý do giao thất bại (ví dụ: khách vắng, sai địa chỉ)", stop.failureReason || "") || undefined;
+      if (reason) updatedStop.failureReason = reason;
+      updatedStop.failedAt = now;
+    }
+
+    updatedStops[currentIndex] = updatedStop;
+
     // Auto advance if not the last
     let nextIndex = currentIndex;
-    let newStatus = route.status;
-    
+    let newStatus: RoutePlan["status"] = route.status;
+
     if (currentIndex < route.stops.length - 1) {
       nextIndex = currentIndex + 1;
     } else {
-      // Check if all are processed
-      const allDone = updatedStops.every(s => s.status !== "pending");
+      // Check if all are processed (not pending)
+      const allDone = updatedStops.every((s) => s.status !== "pending" && s.status !== "ready");
       if (allDone) {
         newStatus = "completed";
       }
     }
 
-    const updatedRoute: RoutePlan = { 
-      ...route, 
-      stops: updatedStops, 
+    const updatedRoute: RoutePlan = {
+      ...route,
+      stops: updatedStops,
       currentStopIndex: nextIndex,
-      status: newStatus 
+      status: newStatus,
     };
+
+    // Persist route
     saveRoute(updatedRoute);
     setRoute(updatedRoute);
+
+    // Also attempt to update central delivery orders if exists
+    try {
+      const masterOrder = getDeliveryOrderById(stop.id);
+      if (masterOrder) {
+        const merged: DeliveryOrder = { ...masterOrder, status, updatedAt: now } as DeliveryOrder;
+        if (status === "delivered") {
+          merged.deliveredAt = updatedStop.deliveredAt;
+          if (updatedStop.recipientName) merged.recipientName = updatedStop.recipientName;
+          if (updatedStop.deliveryNote) merged.deliveryNote = updatedStop.deliveryNote;
+        }
+        if (status === "failed") {
+          merged.failedAt = updatedStop.failedAt;
+          if (updatedStop.failureReason) merged.failureReason = updatedStop.failureReason;
+        }
+        saveDeliveryOrder(merged);
+      }
+    } catch {
+      // non-critical
+    }
 
     if (newStatus === "completed") {
       alert("Bạn đã hoàn thành tất cả các đơn trong tuyến này!");
@@ -84,15 +127,25 @@ export default function DeliveryPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  const statusColors = {
-    pending: "bg-yellow-100 text-yellow-800",
-    delivered: "bg-green-100 text-green-800",
-    skipped: "bg-gray-100 text-gray-800",
+  const statusColors: Record<string, string> = {
+    pending: "bg-amber-50 text-amber-700",
+    ready: "bg-indigo-50 text-indigo-700",
+    assigned: "bg-violet-50 text-violet-700",
+    delivering: "bg-cyan-50 text-cyan-700",
+    delivered: "bg-emerald-50 text-emerald-700",
+    failed: "bg-red-50 text-red-700",
+    cancelled: "bg-slate-100 text-slate-600",
+    skipped: "bg-slate-100 text-slate-600",
   };
 
-  const statusLabels = {
-    pending: "Chưa giao",
+  const statusLabels: Record<string, string> = {
+    pending: "Chờ giao",
+    ready: "Sẵn sàng",
+    assigned: "Đã xếp",
+    delivering: "Đang giao",
     delivered: "Đã giao",
+    failed: "Giao thất bại",
+    cancelled: "Đã hủy",
     skipped: "Bỏ qua",
   };
 
@@ -191,7 +244,7 @@ export default function DeliveryPage({ params }: { params: Promise<{ id: string 
         <div className="flex gap-3">
           <button 
             className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 active:bg-slate-300 py-4 rounded-2xl font-bold text-lg transition-colors border border-slate-200"
-            onClick={() => updateStopStatus("skipped")}
+            onClick={() => updateStopStatus("cancelled")}
           >
             Bỏ qua
           </button>

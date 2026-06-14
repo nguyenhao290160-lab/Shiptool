@@ -369,8 +369,48 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Cách chạy app ở localhost?"
     ],
     relatedRoute: "/settings",
-    relatedRouteName: "Cài đặt hệ thống"
-  }
+    relatedRouteName: "Cài đặt hệ thống",
+  },
+  {
+    id: "delivery_workflow_quick",
+    title: "Quy trình giao hàng - Hỏi nhanh",
+    keywords: ["bắt đầu giao", "đã giao", "giao thất bại", "proof of delivery", "scan đơn"],
+    synonyms: ["bat dau giao hang", "danh dau da giao", "giao that bai"],
+    summary: "Hướng dẫn nhanh về quy trình giao hàng trong ShipRoute AI: cách bắt đầu, đánh dấu đã giao, và báo thất bại.",
+    steps: [
+      "Bắt đầu giao: Mở trang Route -> chọn tuyến -> Bắt đầu giao (app sẽ chuyển sang trang Delivery).",
+      "Đánh dấu Đã giao: Tại điểm hiện tại bấm 'Đã giao' và có thể nhập tên người nhận hoặc ghi chú (lưu cục bộ).",
+      "Báo Giao thất bại: Chọn 'Giao thất bại' và nhập lý do (ví dụ: khách vắng, sai địa chỉ).",
+      "Scan: Trang Scan cho phép tìm nhanh theo mã đơn/SĐT/tên; hiện tại là tính năng local-first, bạn có thể nhập thủ công mã để tìm và cập nhật trạng thái.",
+      "Proof of delivery: ShipRoute AI lưu thông tin đơn cục bộ (recipient name, note, timestamps). Ảnh có thể thêm sau nếu cần (không upload)."
+    ],
+    notes: ["Mọi dữ liệu trạng thái và chứng từ giao hàng được lưu trên thiết bị (localStorage). Khi backup/export sẽ bao gồm các trường deliveredAt/failedAt/recipientName."],
+    relatedModules: ["route_planner", "orders", "history"],
+    suggestedFollowUps: ["Cách ghi chú đã giao?", "Trang Scan dùng để làm gì?"],
+    relatedRoute: "/route-planner",
+    relatedRouteName: "Lập tuyến đường",
+  },
+  {
+    id: "driver_mode",
+    title: "Chế độ đi giao (Driver Mode)",
+    keywords: ["chế độ đi giao", "driver mode", "bắt đầu đi giao", "mở chỉ đường", "gọi khách", "điểm tiếp theo"],
+    synonyms: ["che do lai", "che do giao hang", "bat dau di giao", "mo chi duong"],
+    summary: "Chế độ lái giúp tài xế theo dõi tuyến từng điểm một, mở Google Maps để chỉ đường, gọi khách và cập nhật trạng thái đơn hàng nhanh chóng.",
+    steps: [
+      "Mở trang tuyến và bấm 'Chế độ lái' để vào chế độ tối ưu cho điện thoại.",
+      "Trang sẽ hiển thị điểm hiện tại, nút 'Mở Google Maps' để dẫn đường (dùng tọa độ nếu có), và nút 'Gọi khách' nếu có số điện thoại.",
+      "Khi tới nơi, bấm 'Đã giao' và có thể nhập tên người nhận và ghi chú; nếu giao thất bại bấm 'Giao thất bại' và nhập lý do.",
+      "Sau khi đánh dấu xong, app sẽ chuyển sang điểm tiếp theo tự động. Khi hoàn thành, tuyến sẽ được báo là hoàn tất."
+    ],
+    notes: [
+      "Nếu đơn không có tọa độ thì nút chỉ đường sẽ mở Google Maps tìm kiếm theo địa chỉ.",
+      "Tất cả dữ liệu trạng thái và chứng từ giao hàng được lưu cục bộ trên thiết bị và sẽ xuất ra trong file backup."
+    ],
+    relatedModules: ["route_planner", "orders", "delivery"],
+    suggestedFollowUps: ["Cách mở Google Maps?", "Cách gọi khách từ app?", "Làm sao chuyển sang điểm tiếp theo?"],
+    relatedRoute: "/route-planner",
+    relatedRouteName: "Lập tuyến đường",
+  },
 ];
 
 /**

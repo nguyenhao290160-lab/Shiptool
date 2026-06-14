@@ -14,6 +14,9 @@ interface DeliveryOrder {
   lat?: number | null;
   lng?: number | null;
   note?: string;
+  deliveredAt?: string;
+  failedAt?: string;
+  recipientName?: string;
 }
 
 interface RouteHistoryItem {
@@ -352,6 +355,33 @@ export default function ReportsPage() {
               <button onClick={onPrint} className="bg-white text-slate-700 px-4 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">In báo cáo</button>
             </div>
           </div>
+        </section>
+
+        {/* Recent completed deliveries */}
+        <section className="card-premium">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Giao hàng gần đây</h2>
+          {orders.filter(o => o.deliveredAt).length === 0 ? (
+            <div className="text-sm text-slate-500">Chưa có giao hàng hoàn tất để hiển thị.</div>
+          ) : (
+            <div className="space-y-2">
+              {orders
+                .filter(o => o.deliveredAt)
+                .sort((a,b) => new Date(b.deliveredAt!).getTime() - new Date(a.deliveredAt!).getTime())
+                .slice(0,5)
+                .map(o => (
+                  <div key={o.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-100">
+                    <div>
+                      <div className="font-bold text-slate-900">{o.customerName}</div>
+                      <div className="text-xs text-slate-500">{o.address}</div>
+                    </div>
+                    <div className="text-right text-sm">
+                      <div className="font-semibold text-emerald-700">Đã giao</div>
+                      <div className="text-xs text-slate-500">{o.deliveredAt ? new Date(o.deliveredAt).toLocaleString() : "-"}</div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
         </section>
 
         {/* Summary Stats */}

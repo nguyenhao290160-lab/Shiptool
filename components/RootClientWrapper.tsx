@@ -37,6 +37,9 @@ export function RootClientWrapper({ children }: { children: React.ReactNode }) {
     { href: "/settings", label: "Cài đặt hệ thống", icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     )},
+    { href: "/reports", label: "Báo cáo hiệu suất", icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 3v18M21 7v14H3V3h6"/><path strokeLinecap="round" strokeLinejoin="round" d="M21 3v4h-4"/></svg>
+    )},
   ];
 
   return (
@@ -56,17 +59,30 @@ export function RootClientWrapper({ children }: { children: React.ReactNode }) {
           </div>
           <nav className="space-y-1">
             {menuItems.map((it) => {
-              const active = pathname === it.href || (it.href !== "/home" && pathname?.startsWith(it.href));
+              // Active route rules:
+              // - Exact match for home (/home or /)
+              // - Orders, customers, history, settings, reports: startWith match
+              // - Route group: both /route-planner and any /route/... pages should activate the same item
+              const active = (() => {
+                if (!pathname) return false;
+                if (it.href === "/home") return pathname === "/home" || pathname === "/";
+                if (it.href === "/route-planner") return pathname === "/route-planner" || pathname.startsWith("/route");
+                return pathname === it.href || (it.href !== "/home" && pathname.startsWith(it.href));
+              })();
+
               return (
                 <Link
                   key={it.href}
                   href={it.href}
-                  className={`flex items-center gap-3 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    active 
-                      ? "bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-md shadow-cyan-500/10" 
+                  aria-current={active ? "page" : undefined}
+                  className={`relative flex items-center gap-3 py-3 pl-5 pr-4 rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
+                    active
+                      ? "bg-gradient-to-r from-cyan-600/95 to-cyan-700 text-white shadow-lg shadow-cyan-600/20"
                       : "hover:bg-slate-800 hover:text-white text-slate-400"
                   }`}
                 >
+                  {/* left accent bar for active item */}
+                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-10 w-1 rounded-r-md bg-cyan-400 shadow-sm" aria-hidden="true" />}
                   <div className={active ? "text-white" : "text-slate-400"}>
                     {it.icon}
                   </div>

@@ -20,7 +20,9 @@ export default function OrdersPage({ params }: { params: Promise<{ id: string }>
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isQuickMode, setIsQuickMode] = useState(true);
   const [quickText, setQuickText] = useState("");
-  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
+
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<OrderStop>>({
     receiverName: "", phone: "", address: "", note: "", codAmount: 0
@@ -128,10 +130,29 @@ export default function OrdersPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <MobilePageShell title={route.name} showBack>
-      <div className="mb-24">
+        <div className="mb-24">
         <div className="flex justify-between items-end mb-4 px-1">
           <h2 className="text-xl font-black text-slate-900">Danh sách đơn ({route.stops.length})</h2>
         </div>
+          <div className="px-1 mb-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Tìm theo tên, SĐT, địa chỉ..."
+                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white">
+                <option value="all">Tất cả</option>
+                <option value="pending">Chờ giao</option>
+                <option value="delivering">Đang giao</option>
+                <option value="delivered">Đã giao</option>
+                <option value="failed">Thất bại</option>
+                <option value="cancelled">Đã hủy</option>
+              </select>
+            </div>
+          </div>
 
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -189,15 +210,54 @@ export default function OrdersPage({ params }: { params: Promise<{ id: string }>
         )}
 
         <div className="flex flex-col gap-3">
-          {route.stops.map((stop, i) => (
-            <OrderCard 
-              key={stop.id} 
-              order={stop} 
-              index={i} 
-              onEdit={openEdit} 
-              onDelete={handleDelete} 
-            />
-          ))}
+          {route.stops
+            .filter((s) => {
+              if (statusFilter !== "all" && s.status !== statusFilter) return false;
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return (
+                (s.receiverName || s.label || "").toLowerCase().includes(q) ||
+                (s.phone || "").includes(q) ||
+                (s.address || "").toLowerCase().includes(q) ||
+                s.id.includes(q)
+              );
+            })
+            .map((stop, i) => (
+              <OrderCard
+                key={stop.id}
+                order={stop}
+                index={i}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                isDeliveryMode
+                onStartDelivery={() => {
+                  const updated = { ...stop, status: "delivering", updatedAt: new Date().toISOString() } as OrderStop;
+                  const updatedStops = route.stops.map((s) => (s.id === stop.id ? updated : s));
+                  const updatedRoute = { ...route, stops: updatedStops };
+                  saveRoute(updatedRoute);
+                  setRoute(updatedRoute);
+                }}
+                onMarkDelivered={() => {
+                  const recipient = window.prompt("Tên người nhận (tùy chọn)", stop.recipientName || "") || undefined;
+                  const note = window.prompt("Ghi chú giao (tùy chọn)", stop.deliveryNote || "") || undefined;
+                  const now = new Date().toISOString();
+                  const updated = { ...stop, status: "delivered", deliveredAt: now, recipientName: recipient, deliveryNote: note, updatedAt: now } as OrderStop;
+                  const updatedStops = route.stops.map((s) => (s.id === stop.id ? updated : s));
+                  const updatedRoute = { ...route, stops: updatedStops };
+                  saveRoute(updatedRoute);
+                  setRoute(updatedRoute);
+                }}
+                onMarkFailed={() => {
+                  const reason = window.prompt("Lý do giao thất bại", stop.failureReason || "") || undefined;
+                  const now = new Date().toISOString();
+                  const updated = { ...stop, status: "failed", failedAt: now, failureReason: reason, updatedAt: now } as OrderStop;
+                  const updatedStops = route.stops.map((s) => (s.id === stop.id ? updated : s));
+                  const updatedRoute = { ...route, stops: updatedStops };
+                  saveRoute(updatedRoute);
+                  setRoute(updatedRoute);
+                }}
+              />
+            ))}
         </div>
       </div>
 
@@ -325,12 +385,17 @@ export default function OrdersPage({ params }: { params: Promise<{ id: string }>
 
       {!isFormOpen && (
         <BottomActionBar>
-          <BigActionButton variant="success" onClick={handleStartDelivery}>
-            Xong, Bắt đầu giao
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          </BigActionButton>
+          <div className="w-full flex gap-2">
+            <BigActionButton variant="secondary" className="flex-1" onClick={() => router.push(`/route/${route.id}/driver`)}>
+              Chế độ lái
+            </BigActionButton>
+            <BigActionButton variant="success" className="flex-1" onClick={handleStartDelivery}>
+              Xong, Bắt đầu giao
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </BigActionButton>
+          </div>
         </BottomActionBar>
       )}
     </MobilePageShell>

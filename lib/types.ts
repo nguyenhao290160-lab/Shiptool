@@ -6,9 +6,15 @@ export interface OrderStop {
   address: string;
   note?: string;
   codAmount?: number;
-  status: "pending" | "delivered" | "skipped";
+  status: DeliveryStatus | "skipped";
   createdAt: string;
   updatedAt: string;
+  // Proof / delivery metadata (optional)
+  deliveredAt?: string;
+  failedAt?: string;
+  deliveryNote?: string;
+  failureReason?: string;
+  recipientName?: string;
 }
 
 export interface RoutePlan {
@@ -58,6 +64,12 @@ export interface DeliveryOrder {
   createdAt: string;
   updatedAt: string;
   deliveryWindow?: string;
+  // Proof fields
+  deliveredAt?: string;
+  failedAt?: string;
+  deliveryNote?: string;
+  failureReason?: string;
+  recipientName?: string;
 }
 
 // ── Route Planner (Prompt 3) ────────────────────────────────────────
@@ -80,6 +92,8 @@ export interface RoutePoint {
   priority: DeliveryPriority;
   lat?: number;
   lng?: number;
+  deliveredAt?: string;
+  failedAt?: string;
 }
 
 export interface DeliveryRoutePlan {
@@ -105,6 +119,8 @@ export interface RouteHistoryPoint {
   lat?: number;
   lng?: number;
   note?: string;
+  deliveredAt?: string;
+  failedAt?: string;
 }
 
 export interface RouteHistoryItem {

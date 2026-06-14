@@ -33,6 +33,8 @@ export default function ScanPage({ params }: { params: Promise<{ id: string }> }
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [quickSearch, setQuickSearch] = useState("");
+  const [quickResult, setQuickResult] = useState<OrderStop | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -49,6 +51,16 @@ export default function ScanPage({ params }: { params: Promise<{ id: string }> }
 
   if (!isMounted) return <MobilePageShell><div className="p-5"></div></MobilePageShell>;
   if (!route) return <MobilePageShell><p>Loading...</p></MobilePageShell>;
+
+  const handleQuickSearch = (q: string) => {
+    setQuickSearch(q);
+    if (!q.trim()) {
+      setQuickResult(null);
+      return;
+    }
+    const found = route.stops.find((s) => s.id === q || (s.phone && s.phone.includes(q)) || (s.receiverName && s.receiverName.toLowerCase().includes(q.toLowerCase())) || (s.label && s.label.toLowerCase().includes(q.toLowerCase())));
+    setQuickResult(found || null);
+  };
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -219,6 +231,58 @@ export default function ScanPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         {/* Input Triggers */}
+        <div className="px-4 mb-4">
+          <label className="text-xs font-bold text-slate-600 mb-1 block">Tìm nhanh (mã đơn / SĐT / tên)</label>
+          <div className="flex gap-2">
+            <input value={quickSearch} onChange={(e) => handleQuickSearch(e.target.value)} className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white" placeholder="Nhập mã đơn, SĐT, hoặc tên khách..." />
+            <button onClick={() => handleQuickSearch(quickSearch)} className="px-3 py-2 bg-slate-100 rounded-xl">Tìm</button>
+          </div>
+
+          {quickResult ? (
+            <div className="mt-3 bg-white p-3 rounded-xl border border-slate-100">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-bold">{quickResult.receiverName || quickResult.label}</div>
+                  <div className="text-sm text-slate-500">{quickResult.address}</div>
+                </div>
+                <div className="text-sm">
+                  <div className="mb-2"><strong>Trạng thái:</strong> {quickResult.status}</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                      const now = new Date().toISOString();
+                      const updated = { ...quickResult, status: 'delivering', updatedAt: now } as OrderStop;
+                      const updatedStops = route.stops.map(s => s.id === quickResult.id ? updated : s);
+                      saveRoute({ ...route, stops: updatedStops });
+                      setRoute({ ...route, stops: updatedStops });
+                      setQuickResult(updated);
+                    }} className="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl">Bắt đầu</button>
+                    <button onClick={() => {
+                      const recipient = window.prompt('Tên người nhận (tùy chọn)') || undefined;
+                      const note = window.prompt('Ghi chú giao (tùy chọn)') || undefined;
+                      const now = new Date().toISOString();
+                      const updated = { ...quickResult, status: 'delivered', deliveredAt: now, recipientName: recipient, deliveryNote: note, updatedAt: now } as OrderStop;
+                      const updatedStops = route.stops.map(s => s.id === quickResult.id ? updated : s);
+                      saveRoute({ ...route, stops: updatedStops });
+                      setRoute({ ...route, stops: updatedStops });
+                      setQuickResult(updated);
+                    }} className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl">Đã giao</button>
+                    <button onClick={() => {
+                      const reason = window.prompt('Lý do thất bại') || undefined;
+                      const now = new Date().toISOString();
+                      const updated = { ...quickResult, status: 'failed', failedAt: now, failureReason: reason, updatedAt: now } as OrderStop;
+                      const updatedStops = route.stops.map(s => s.id === quickResult.id ? updated : s);
+                      saveRoute({ ...route, stops: updatedStops });
+                      setRoute({ ...route, stops: updatedStops });
+                      setQuickResult(updated);
+                    }} className="px-3 py-2 bg-red-50 text-red-700 rounded-xl">Giao thất bại</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : quickSearch.trim() ? (
+            <div className="mt-3 text-sm text-slate-500">Không tìm thấy đơn phù hợp trong tuyến.</div>
+          ) : null}
+        </div>
         <div className="grid grid-cols-2 gap-3 px-4 mb-6">
           <input 
             type="file" 

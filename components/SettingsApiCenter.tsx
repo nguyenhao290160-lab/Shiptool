@@ -45,6 +45,8 @@ export function SettingsApiCenter() {
     geocodeStatus: "success" | "failed" | "not_tested";
     detailedError: { title: string; message: string; fix: string } | null;
   } | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
   const refreshStats = () => {
     setOrdersCount(getDeliveryOrdersCount());
@@ -173,198 +175,193 @@ export function SettingsApiCenter() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* LEFT COLUMN */}
         <div className="space-y-5">
-          {/* API Key Section */}
-          <div className="card-premium space-y-4">
-            <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">🔑</span>
-              Google Maps API Key
-            </h2>
+            {/* API Key Section (Simplified UX) */}
+            <div className="card-premium space-y-4">
+              <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2.5">
+                <span className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">🔑</span>
+                Google Maps API Key
+              </h2>
 
-            {/* Status Card */}
-            <div
-              className={`rounded-xl p-4 border ${
-                isApiKeySet
-                  ? "bg-emerald-50/80 border-emerald-200/80"
-                  : "bg-amber-50/80 border-amber-200/80"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sm text-slate-800">Trạng thái</span>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    isApiKeySet
-                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                      : "bg-amber-100 text-amber-800 border border-amber-200"
-                  }`}
-                >
-                  {isApiKeySet ? "✓ Đã cấu hình" : "⚠ Chưa cấu hình"}
-                </span>
-              </div>
-              <p className="text-slate-600 font-mono text-xs bg-white/60 rounded-lg px-3 py-2 border border-slate-200/50">{apiKeyMasked}</p>
-            </div>
-
-            {/* Setup Instructions */}
-            <div className="bg-sky-50/80 border border-sky-200/80 rounded-xl p-4">
-              <h3 className="font-bold text-sm text-sky-900 mb-3 flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-sky-100 border border-sky-200 flex items-center justify-center text-sm">📋</span>
-                Hướng dẫn cấu hình
-              </h3>
-              <div className="space-y-2.5 text-sm text-sky-900">
-                <p>
-                  <strong>Bước 1:</strong> Tạo file <code className="bg-white/80 px-2 py-0.5 rounded-md font-mono text-xs border border-sky-200/50">.env.local</code> ở thư mục gốc project.
-                </p>
-                <p>
-                  <strong>Bước 2:</strong> Thêm dòng sau vào file:
-                </p>
-                <div className="code-block-light !bg-white/80 !border-sky-200/50">
-                  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here
+              {/* Simplified status */}
+              <div className="rounded-xl p-4 border bg-white/60">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">Trạng thái</div>
+                        <div className="text-xs text-slate-600">Thiết lập API key cho Google Maps</div>
+                        {isApiKeySet && apiKeyMasked ? (
+                          <div className="text-xs text-slate-500 mt-1">Khóa: <span className="font-mono">{apiKeyMasked}</span></div>
+                        ) : null}
+                  </div>
+                  <div>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${isApiKeySet ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
+                      {isApiKeySet ? 'Đã cấu hình' : 'Chưa cấu hình'}
+                    </span>
+                  </div>
                 </div>
-                <p>
-                  <strong>Bước 3:</strong> Thay <code className="bg-white/80 px-2 py-0.5 rounded-md font-mono text-xs border border-sky-200/50">your_api_key_here</code> bằng API key thật từ Google Cloud.
-                </p>
-                <p>
-                  <strong>Bước 4:</strong> Restart dev server bằng <code className="bg-white/80 px-2 py-0.5 rounded-md font-mono text-xs border border-sky-200/50">npm run dev</code>.
-                </p>
-                <p className="text-xs text-sky-700 mt-2 bg-white/60 rounded-lg px-3 py-2 border border-sky-200/50">
-                  💡 <strong>Lưu ý:</strong> Không commit file <code className="font-mono">.env.local</code> lên GitHub! Khi deploy lên môi trường Production (như Vercel, Netlify), bạn cần thiết lập biến môi trường <code className="font-mono">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> trực tiếp trong phần cấu hình biến môi trường (Environment Variables) của dịch vụ hosting đó.
-                </p>
               </div>
-            </div>
 
-            {/* Google Maps Configuration Diagnostics (Added for Prompt 39) */}
-            <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80 space-y-3">
-              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center text-sm">🔍</span>
-                Chẩn đoán Google Maps
-              </h3>
-              
-              <p className="text-xs text-slate-600 font-medium">
-                Chạy kiểm thử kết nối và quyền hạn API key để đảm bảo các dịch vụ bản đồ hoạt động đúng.
-              </p>
+              {/* 4-step Setup Card + Copy */}
+              <div className="rounded-xl p-4 border bg-slate-50/80 space-y-3">
+                <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-sky-100 border border-sky-200 flex items-center justify-center text-sm">📋</span>
+                  Hướng dẫn nhanh (4 bước)
+                </h3>
 
-              <button
-                onClick={runDiagnostics}
-                disabled={diagLoading}
-                className="w-full bg-violet-600 hover:bg-violet-700 active:bg-violet-800 disabled:bg-slate-400 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-xs flex items-center justify-center gap-2 shadow-sm"
-              >
-                {diagLoading ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang chạy kiểm tra...
-                  </>
-                ) : (
-                  <>
-                    <span>Kiểm tra cấu hình Google Maps</span>
-                  </>
-                )}
-              </button>
+                <ol className="list-decimal pl-5 space-y-2 text-sm text-slate-700">
+                  <li><strong>Tạo / mở</strong> file <code className="font-mono text-xs bg-white px-1 rounded">.env.local</code> ở thư mục gốc (C:\Shiptool).</li>
+                  <li><strong>Dán</strong> dòng cấu hình mẫu bên dưới vào file.</li>
+                  <li><strong>Thay</strong> your_api_key_here bằng API key thật (không dán vào app).</li>
+                  <li><strong>Khởi động lại</strong> dev server: Ctrl + C rồi <code className="font-mono text-xs bg-white px-1 rounded">npm run dev</code>.</li>
+                </ol>
 
-              {/* Diagnostic Results */}
-              {diagResult && (
-                <div className="space-y-3 pt-2">
-                  <div className="space-y-2 border-t border-slate-200/60 pt-2.5">
-                    {/* API Key Check */}
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-medium">1. Khóa API Key:</span>
-                      <span className={`font-bold ${diagResult.apiKeyStatus === "ok" ? "text-emerald-600" : "text-amber-600"}`}>
-                        {diagResult.apiKeyStatus === "ok" ? "✓ Đã tìm thấy" : "✗ Chưa có"}
-                      </span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="code-block-light overflow-x-auto rounded-md p-2 text-sm font-mono flex items-center justify-between gap-3">
+                      <span className="truncate">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here</span>
                     </div>
-
-                    {/* Internet Check */}
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-medium">2. Kết nối Internet:</span>
-                      <span className={`font-bold ${diagResult.internetStatus === "online" ? "text-emerald-600" : "text-red-600"}`}>
-                        {diagResult.internetStatus === "online" ? "✓ Kết nối tốt" : "✗ Ngoại tuyến"}
-                      </span>
-                    </div>
-
-                    {/* Script Load Check */}
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-medium">3. Tải Maps Script:</span>
-                      <span className={`font-bold ${
-                        diagResult.scriptStatus === "success" 
-                          ? "text-emerald-600" 
-                          : diagResult.scriptStatus === "failed" 
-                          ? "text-red-600" 
-                          : "text-slate-400"
-                      }`}>
-                        {diagResult.scriptStatus === "success" && "✓ Thành công"}
-                        {diagResult.scriptStatus === "failed" && "✗ Thất bại"}
-                        {diagResult.scriptStatus === "not_tested" && "— Chưa thử"}
-                      </span>
-                    </div>
-
-                    {/* Geocoding API Check */}
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-medium">4. Google Geocoding API:</span>
-                      <span className={`font-bold ${
-                        diagResult.geocodeStatus === "success" 
-                          ? "text-emerald-600" 
-                          : diagResult.geocodeStatus === "failed" 
-                          ? "text-red-600" 
-                          : "text-slate-400"
-                      }`}>
-                        {diagResult.geocodeStatus === "success" && "✓ Hoạt động tốt"}
-                        {diagResult.geocodeStatus === "failed" && "✗ Gặp lỗi"}
-                        {diagResult.geocodeStatus === "not_tested" && "— Chưa thử"}
-                      </span>
-                    </div>
+                    <div className="text-xs text-slate-500 mt-2">Không lưu key trong trình duyệt. Thêm vào file <code className="font-mono">.env.local</code> trên máy của bạn.</div>
                   </div>
 
-                  {/* Detailed Error Box */}
-                  {diagResult.detailedError && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5 text-xs">
-                      <p className="font-bold text-red-800 flex items-center gap-1.5">
-                        <span className="text-sm">⚠️</span>
-                        {diagResult.detailedError.title}
-                      </p>
-                      <p className="text-red-700 leading-relaxed font-medium">
-                        {diagResult.detailedError.message}
-                      </p>
-                      <div className="border-t border-red-200/50 my-1 pt-1.5">
-                        <p className="font-bold text-slate-700 uppercase text-[9px] tracking-wider">Cách khắc phục đề xuất:</p>
-                        <p className="text-slate-600 font-medium leading-relaxed mt-0.5">
-                          {diagResult.detailedError.fix}
-                        </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                            try {
+                                  await navigator.clipboard.writeText('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here');
+                                  setCopyStatus('success');
+                                  setTimeout(() => setCopyStatus('idle'), 2000);
+                                } catch {
+                                  setCopyStatus('error');
+                                  setTimeout(() => setCopyStatus('idle'), 2500);
+                                }
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-sm font-semibold shadow-sm focus:outline-none"
+                    >
+                      <span>Sao chép dòng cấu hình</span>
+                    </button>
+
+                    <a
+                      href="https://developers.google.com/maps/documentation"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      Mở hướng dẫn Google Maps
+                    </a>
+                  </div>
+                </div>
+
+                {/* copy status */}
+                {copyStatus === 'success' && <div className="text-xs text-emerald-700 font-semibold">Đã sao chép</div>}
+                {copyStatus === 'error' && <div className="text-xs text-amber-700 font-semibold">Không thể sao chép. Vui lòng sao chép thủ công.</div>}
+              </div>
+
+              {/* Where to put the key */}
+              <div className="rounded-xl p-3 border bg-white/60 text-sm">
+                <strong>Gắn key ở đâu?</strong>
+                <div className="mt-2 text-slate-600">
+                  Mở file <code className="font-mono">.env.local</code> ở thư mục gốc <code className="font-mono">C:\Shiptool</code> và dán dòng <code className="font-mono">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...</code>. Sau khi sửa, tắt dev server (Ctrl + C) rồi chạy lại <code className="font-mono">npm run dev</code>.
+                </div>
+              </div>
+
+              {/* Diagnostics - simplified rows */}
+              <div className="rounded-xl p-4 border bg-slate-50/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-sm">Kiểm tra cấu hình Google Maps</div>
+                  <div className="text-xs text-slate-500">Chạy nhanh các kiểm tra cơ bản</div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <button
+                    onClick={runDiagnostics}
+                    disabled={diagLoading}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm focus:outline-none ${diagLoading ? 'bg-slate-400 text-white cursor-wait' : 'bg-violet-600 hover:bg-violet-700 text-white'}`}
+                  >
+                    {diagLoading ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Đang kiểm tra...
+                      </>
+                    ) : (
+                      <>Kiểm tra cấu hình</>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((s) => !s)}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm hover:bg-slate-50"
+                  >
+                    Xem lỗi thường gặp
+                  </button>
+                </div>
+
+                {/* Simple status rows (if diagResult exists) */}
+                {diagResult && (
+                  <div className="space-y-2 pt-2">
+                    {/** Row helper */}
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-700">API Key</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${diagResult.apiKeyStatus === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{diagResult.apiKeyStatus === 'ok' ? 'OK' : 'Chưa cấu hình'}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-700">Kết nối Internet</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${diagResult.internetStatus === 'online' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{diagResult.internetStatus === 'online' ? 'OK' : 'Ngoại tuyến'}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-700">Google Maps Script</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${diagResult.scriptStatus === 'success' ? 'bg-emerald-100 text-emerald-800' : diagResult.scriptStatus === 'failed' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'}`}>{diagResult.scriptStatus === 'success' ? 'OK' : diagResult.scriptStatus === 'failed' ? 'Lỗi' : 'Chưa thử'}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-700">Geocoding API</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${diagResult.geocodeStatus === 'success' ? 'bg-emerald-100 text-emerald-800' : diagResult.geocodeStatus === 'failed' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'}`}>{diagResult.geocodeStatus === 'success' ? 'OK' : diagResult.geocodeStatus === 'failed' ? 'Lỗi' : 'Chưa thử'}</span>
                       </div>
                     </div>
-                  )}
 
-                  {!diagResult.detailedError && diagResult.geocodeStatus === "success" && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 font-semibold flex items-center gap-1.5">
-                      <span>🎉</span>
-                      <span>Cấu hình Google Maps hoàn toàn chính xác và sẵn sàng sử dụng!</span>
-                    </div>
-                  )}
-                </div>
-              )}
+                    {/* Short explanation or friendly message */}
+                    {diagResult.detailedError ? (
+                      <div className="mt-2 rounded-md p-3 bg-rose-50 border border-rose-200 text-sm text-rose-800">
+                        <div className="font-semibold">{diagResult.detailedError.title}</div>
+                        <div className="mt-1 text-slate-700">{diagResult.detailedError.message}</div>
+                        <div className="mt-2 text-slate-600 text-sm">{diagResult.detailedError.fix}</div>
+                      </div>
+                    ) : diagResult.geocodeStatus === 'success' ? (
+                      <div className="mt-2 rounded-md p-3 bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 font-semibold">🎉 Cấu hình Google Maps hoạt động tốt.</div>
+                    ) : null}
+
+                    {/* Advanced collapsible */}
+                    {showAdvanced && (
+                      <div className="mt-2 p-3 border rounded-md bg-white text-sm text-slate-700">
+                        <div className="font-semibold mb-2">Chi tiết nâng cao</div>
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>ReferrerNotAllowedMapError — kiểm tra HTTP referrers ở Google Cloud.</li>
+                          <li>API not enabled — bật Maps JS, Geocoding, Directions và Distance Matrix trong GCP.</li>
+                          <li>Billing not enabled — bật billing cho project nếu cần.</li>
+                          <li>Request denied / Invalid API Key — kiểm tra chuỗi key và giới hạn.</li>
+                          <li>Script load failed / Timeout — kiểm tra mạng cục bộ và tường lửa.</li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Security Warning */}
+          {/* Security Warning (short) */}
           <div className="rounded-xl p-4 border border-rose-200/80 bg-rose-50/60" style={{ boxShadow: "var(--shadow-sm)" }}>
             <h3 className="font-bold text-sm text-rose-900 mb-3 flex items-center gap-2">
               <span className="w-7 h-7 rounded-lg bg-rose-100 border border-rose-200 flex items-center justify-center text-sm">⚠️</span>
               Cảnh báo bảo mật
             </h3>
             <ul className="text-sm text-rose-800 space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5">🔒</span>
-                <span>Không commit file <code className="bg-white/60 px-1.5 py-0.5 rounded font-mono text-xs">.env.local</code> lên GitHub</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5">🚫</span>
-                <span>Không dán API key trực tiếp vào code nguồn</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5">🌍</span>
-                <span>Giới hạn API key theo domain/IP trong Google Cloud nếu deploy</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5">🔐</span>
-                <span>Sử dụng HTTP referrers và bật API restrictions để bảo vệ key</span>
-              </li>
+              <li className="flex items-start gap-2"><span className="mt-0.5">🚫</span><span>Không commit <code className="font-mono">.env.local</code> lên GitHub.</span></li>
+              <li className="flex items-start gap-2"><span className="mt-0.5">🔒</span><span>Không dán API key trực tiếp vào code nguồn.</span></li>
+              <li className="flex items-start gap-2"><span className="mt-0.5">⚙️</span><span>Khi deploy, cấu hình key ở Environment Variables của hosting.</span></li>
+              <li className="flex items-start gap-2"><span className="mt-0.5">🌐</span><span>Nên giới hạn API key bằng HTTP referrers trong Google Cloud.</span></li>
             </ul>
           </div>
         </div>

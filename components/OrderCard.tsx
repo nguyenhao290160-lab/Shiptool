@@ -8,9 +8,12 @@ interface Props {
   onEdit: (order: OrderStop) => void;
   onDelete: (id: string) => void;
   isDeliveryMode?: boolean;
+  onStartDelivery?: (order: OrderStop) => void;
+  onMarkDelivered?: (order: OrderStop) => void;
+  onMarkFailed?: (order: OrderStop) => void;
 }
 
-export const OrderCard = ({ order, index, onEdit, onDelete, isDeliveryMode = false }: Props) => {
+export const OrderCard = ({ order, index, onEdit, onDelete, isDeliveryMode = false, onStartDelivery, onMarkDelivered, onMarkFailed }: Props) => {
   // status rendering is delegated to StatusBadge for consistent styling
 
   return (
@@ -61,7 +64,28 @@ export const OrderCard = ({ order, index, onEdit, onDelete, isDeliveryMode = fal
         </div>
       ) : null}
 
-      {!isDeliveryMode && (
+      {isDeliveryMode ? (
+        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+          <button
+            onClick={() => onStartDelivery?.(order)}
+            className="flex-1 bg-indigo-50 text-indigo-700 font-bold py-2 rounded-xl hover:bg-indigo-100 transition-colors"
+          >
+            Bắt đầu
+          </button>
+          <button
+            onClick={() => onMarkDelivered?.(order)}
+            className="flex-1 bg-emerald-50 text-emerald-700 font-bold py-2 rounded-xl hover:bg-emerald-100 transition-colors"
+          >
+            Đã giao
+          </button>
+          <button
+            onClick={() => onMarkFailed?.(order)}
+            className="flex-1 bg-red-50 text-red-600 font-bold py-2 rounded-xl hover:bg-red-100 transition-colors"
+          >
+            Giao thất bại
+          </button>
+        </div>
+      ) : (
         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
           <button 
             onClick={() => onEdit(order)}
